@@ -28,7 +28,11 @@
   };
   firebase.initializeApp(FIREBASE_CONFIG);
   var DB = firebase.firestore();
-  var DOC_REF = DB.collection("eod-system").doc("state");
+  var CONFIG_REF = DB.collection("eod-system").doc("config");
+  var ENTRIES_COL = DB.collection("eod-system-entries");
+  function entryDocId(location, date){
+    return (String(location) + "__" + String(date)).replace(/[\/\.#$\[\]]/g, "_");
+  }
 </script>
 </head>
 <body>
@@ -225,6 +229,7 @@ function appMain(){
   /* ---------- root render ---------- */
   function render(){
     var app = document.getElementById("app");
+    var scrollX = window.scrollX, scrollY = window.scrollY;
     var active = document.activeElement;
     var restore = null;
     if(active && app.contains(active) && active.hasAttribute && active.hasAttribute("data-action")){
@@ -252,6 +257,7 @@ function appMain(){
         }
       }
     }
+    window.scrollTo(scrollX, scrollY);
   }
 
   function renderTabBar(){
@@ -658,20 +664,29 @@ function appMain(){
     return '<!doctype html>\n<html lang="en" data-theme="light">\n<head>\n' + head + '\n</head>\n<body>\n<div id="app"></div>\n<script>\n' + script + '\n<' + '/script>\n</body>\n</html>';
   }
 
-  async function save(newState, successMsg){
+  function saveEntry(entry, successMsg){
     if(ui.saving) return;
     ui.saving = true; render();
-    try{
-      await DOC_REF.set(newState);
-      STATE = newState;
-      ui.saving = false;
-      render();
-      showToast(successMsg);
-    } catch(err){
-      ui.saving = false;
-      render();
-      showToast("Couldn\u2019t save \u2014 " + (err && err.message ? err.message : "check your Firebase setup") + ".");
-    }
+    var idx = STATE.entries.findIndex(function(e){ return e.date===entry.date && e.location===entry.location; });
+    if(idx>=0) STATE.entries[idx] = entry; else STATE.entries.push(entry);
+    ui.saving = false; render();
+    showToast(successMsg);
+    ENTRIES_COL.doc(entryDocId(entry.location, entry.date)).set(entry).catch(function(err){
+      showToast("That didn’t actually save — " + (err && err.message ? err.message : "check your Firebase setup") + ".");
+    });
+  }
+
+  function saveConfig(configPatch, successMsg){
+    if(ui.saving) return;
+    ui.saving = true; render();
+    STATE.catalog = configPatch.catalog;
+    STATE.locations = configPatch.locations;
+    STATE.catalogTabs = configPatch.catalogTabs;
+    ui.saving = false; render();
+    showToast(successMsg);
+    CONFIG_REF.set(configPatch).catch(function(err){
+      showToast("That didn’t actually save — " + (err && err.message ? err.message : "check your Firebase setup") + ".");
+    });
   }
 
   /* ---------- actions ---------- */
@@ -734,8 +749,6 @@ function appMain(){
       return {id:id, note:(ui.count.selected[id]||"").trim()};
     });
 
-    var newState = JSON.parse(JSON.stringify(STATE));
-    var idx = newState.entries.findIndex(function(e){ return e.date===date && e.location===loc; });
     var entry = {
       date:date, location:loc, closer: ui.count.closer.trim(),
       staffing: {
@@ -754,8 +767,7 @@ function appMain(){
       opsNotes: ui.count.opsOk ? OPS_OK : ui.count.opsText.trim(),
       submittedAt: new Date().toISOString()
     };
-    if(idx>=0) newState.entries[idx] = entry; else newState.entries.push(entry);
-    save(newState, "Saved tonight’s restock list for " + loc + ".");
+    saveEntry(entry, "Saved tonight’s restock list for " + loc + ".");
   }
 
   function addCatalogItem(tab){
@@ -783,12 +795,9 @@ function appMain(){
   }
   function saveManageDraft(){
     var draft = ui.manageDraft;
-    var newState = JSON.parse(JSON.stringify(STATE));
-    newState.catalog = draft.catalog;
-    newState.locations = draft.locations;
-    newState.catalogTabs = draft.catalogTabs;
+    var configPatch = { catalog: draft.catalog, locations: draft.locations, catalogTabs: draft.catalogTabs };
     ui.manageDraft = null;
-    save(newState, "Catalog updated.");
+    saveConfig(configPatch, "Catalog updated.");
   }
   function readDraftFromInputs(){
     var draft = ui.manageDraft;
@@ -891,18 +900,29 @@ function appMain(){
   }
 
   function startFirebaseSync(){
-    DOC_REF.onSnapshot(function(snap){
+    CONFIG_REF.onSnapshot(function(snap){
       if(snap.exists){
-        STATE = snap.data();
+        var d = snap.data();
+        STATE.catalog = d.catalog || STATE.catalog;
+        STATE.locations = d.locations || STATE.locations;
+        STATE.catalogTabs = d.catalogTabs || STATE.catalogTabs;
       } else {
-        /* first time ever \u2014 seed the shared database with the built-in catalog */
-        DOC_REF.set(STATE).catch(function(err){
-          showToast("Couldn\u2019t create the shared database \u2014 check your Firebase setup.");
+        CONFIG_REF.set({ catalog: STATE.catalog, locations: STATE.locations, catalogTabs: STATE.catalogTabs }).catch(function(err){
+          showToast("Couldn’t create the shared database — check your Firebase setup.");
         });
       }
       render();
     }, function(err){
-      showToast("Couldn\u2019t connect to the shared database \u2014 check your Firebase setup.");
+      showToast("Couldn’t connect to the shared database — check your Firebase setup.");
+    });
+
+    ENTRIES_COL.onSnapshot(function(qs){
+      var entries = [];
+      qs.forEach(function(doc){ entries.push(doc.data()); });
+      STATE.entries = entries;
+      render();
+    }, function(err){
+      showToast("Couldn’t connect to the shared database — check your Firebase setup.");
     });
   }
 
