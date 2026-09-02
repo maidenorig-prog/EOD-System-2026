@@ -176,25 +176,16 @@ function appMain(){
   }
   function frontDeskSummary(fd){
     if(!fd) return "No note logged.";
-    if(fd.ok) return "No delays, unfinished services, guest issues, or equipment problems.";
+    if(fd.ok) return "No staffing/attendance issues, delays, unfinished services, guest issues, or equipment problems.";
     return fd.detail || "";
   }
-  function staffingSummary(s){
-    if(!s) return "No note logged.";
-    if(s.ok) return STAFFING_OK;
-    var covLabel = s.coverage==="yes" ? "coverage arranged" : s.coverage==="no" ? "no coverage arranged" : s.coverage==="na" ? "coverage N/A" : "coverage unspecified";
-    return (s.detail||"") + " (" + covLabel + ")";
-  }
-
   /* ---------- ui (per-viewer, not persisted) ---------- */
-  var STAFFING_OK = "Everyone scheduled showed up on time.";
   var CLEANING_OK = "Floors, trash, and all cleaning duties completed.";
   var OPS_OK = "Nothing to flag.";
   var ui = {
     tab: "count",
     count: {
       location: null, date: todayStr(), closer: "",
-      staffing: { ok: true, detail: "", coverage: "" },
       frontDesk: blankFrontDesk(),
       cleaningOk: true, cleaningText: "",
       opsOk: true, opsText: "",
@@ -303,7 +294,6 @@ function appMain(){
       ui.count.search = "";
       if(!ui.count.catalogTab || tabs.indexOf(ui.count.catalogTab)===-1) ui.count.catalogTab = tabs[0];
       ui.count.closer = existing ? (existing.closer||"") : "";
-      ui.count.staffing = (existing && existing.staffing) ? JSON.parse(JSON.stringify(existing.staffing)) : { ok: true, detail: "", coverage: "" };
       ui.count.frontDesk = (existing && existing.frontDesk) ? JSON.parse(JSON.stringify(existing.frontDesk)) : blankFrontDesk();
       ui.count.cleaningOk = existing ? (existing.cleaning === CLEANING_OK) : true;
       ui.count.cleaningText = (existing && existing.cleaning !== CLEANING_OK) ? existing.cleaning : "";
@@ -323,23 +313,8 @@ function appMain(){
     }
     out += '</div>';
 
-    out += '<div class="card"><div class="card-head"><h3>Staffing & Attendance</h3></div>' +
-      '<p class="helper" style="margin-top:-8px">Did everyone scheduled show up on time?</p>' +
-      '<label class="check-row"><input type="checkbox" data-action="toggle-staffing"'+(ui.count.staffing.ok?" checked":"")+'> Yes — everyone on time</label>';
-    if(!ui.count.staffing.ok){
-      out += '<textarea data-action="set-staffing-detail" placeholder="Who, and what happened? (called out / no-call no-show / late / left early)">'+escapeHtml(ui.count.staffing.detail)+'</textarea>';
-      out += '<div class="field" style="margin-top:10px;max-width:240px"><label for="f-staffing-coverage">Was coverage arranged?</label>' +
-        '<select id="f-staffing-coverage" data-action="set-staffing-coverage">' +
-          '<option value=""'+(ui.count.staffing.coverage===""?" selected":"")+'>Choose one…</option>' +
-          '<option value="yes"'+(ui.count.staffing.coverage==="yes"?" selected":"")+'>Yes</option>' +
-          '<option value="no"'+(ui.count.staffing.coverage==="no"?" selected":"")+'>No</option>' +
-          '<option value="na"'+(ui.count.staffing.coverage==="na"?" selected":"")+'>N/A</option>' +
-        '</select></div>';
-    }
-    out += '</div>';
-
     out += '<div class="card"><div class="card-head"><h3>Front Desk & Salon</h3></div>' +
-      '<p class="helper" style="margin-top:-8px">Any delays, unfinished services, guest issues, or equipment problems?</p>' +
+      '<p class="helper" style="margin-top:-8px">Any staffing/attendance issues, delays, unfinished services, guest issues, or equipment problems?</p>' +
       '<label class="check-row"><input type="checkbox" data-action="toggle-fd"'+(ui.count.frontDesk.ok?" checked":"")+'> No issues</label>';
     if(!ui.count.frontDesk.ok){
       out += '<textarea data-action="set-fd-detail" placeholder="What happened, and is it resolved or does someone still need to follow up?">'+escapeHtml(ui.count.frontDesk.detail)+'</textarea>';
@@ -466,12 +441,10 @@ function appMain(){
       out += '<p class="helper" style="margin:-6px 0 12px">Closed by '+escapeHtml(entry.closer||"unknown")+' at '+formatTime(entry.submittedAt)+
              (prev ? ' · compared to '+formatDateLong(prev.date)+' ('+escapeHtml(prev.closer||"unknown")+')' : ' · first night on record for this location') + '</p>';
 
-      var staffFlag = entry.staffing && !entry.staffing.ok;
       var fdFlag = frontDeskAnyFlag(entry.frontDesk);
       var cleanFlag = entry.cleaning && entry.cleaning !== CLEANING_OK;
       var opsFlag = entry.opsNotes && entry.opsNotes !== OPS_OK;
       out += '<div class="grid-2" style="margin-bottom:14px">' +
-        '<div class="banner '+(staffFlag?"banner-warn":"banner-info")+'">'+(staffFlag?ICONS.warn:"")+'<div><strong>Staffing & Attendance</strong><br>'+escapeHtml(staffingSummary(entry.staffing))+'</div></div>' +
         '<div class="banner '+(fdFlag?"banner-warn":"banner-info")+'">'+(fdFlag?ICONS.warn:"")+'<div><strong>Front Desk & Salon</strong><br>'+escapeHtml(frontDeskSummary(entry.frontDesk))+'</div></div>' +
         '<div class="banner '+(cleanFlag?"banner-warn":"banner-info")+'">'+(cleanFlag?ICONS.warn:"")+'<div><strong>Cleaning Duties</strong><br>'+escapeHtml(entry.cleaning||"No note logged.")+'</div></div>' +
         '<div class="banner '+(opsFlag?"banner-warn":"banner-info")+'">'+(opsFlag?ICONS.warn:"")+'<div><strong>Operational Notes</strong><br>'+escapeHtml(entry.opsNotes||"No note logged.")+'</div></div>' +
@@ -525,11 +498,10 @@ function appMain(){
       var restocks = e.nothingToRestock ? [] : (e.restocks||[]);
       var key = e.date+"|"+e.location;
       var open = !!ui.historyOpen[key];
-      var staffFlag = e.staffing && !e.staffing.ok;
       var fdFlag = frontDeskAnyFlag(e.frontDesk);
       var cleanFlag = e.cleaning && e.cleaning !== CLEANING_OK;
       var opsFlag = e.opsNotes && e.opsNotes !== OPS_OK;
-      var notesFlag = staffFlag || fdFlag || cleanFlag || opsFlag;
+      var notesFlag = fdFlag || cleanFlag || opsFlag;
       out += '<tr><td><button class="history-toggle" data-action="toggle-history" data-key="'+key+'"><svg class="chev'+(open?" open":"")+'" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M9 6l6 6-6 6"></path></svg></button></td>' +
         '<td>'+formatDateLong(e.date)+'</td><td>'+escapeHtml(e.location)+'</td><td>'+escapeHtml(e.closer||"—")+'</td>' +
         '<td>'+(restocks.length ? '<span class="pill pill-reorder">'+restocks.length+'</span>' : '<span class="pill pill-ok">0</span>')+'</td>' +
@@ -538,7 +510,6 @@ function appMain(){
       if(open){
         out += '<tr class="detail-row"><td></td><td colspan="6">' +
           '<div class="stack" style="margin-bottom:12px">' +
-          '<div><strong>Staffing & Attendance:</strong> '+escapeHtml(staffingSummary(e.staffing))+'</div>' +
           '<div><strong>Front Desk & Salon:</strong> '+escapeHtml(frontDeskSummary(e.frontDesk))+'</div>' +
           '<div><strong>Cleaning Duties:</strong> '+escapeHtml(e.cleaning||"No note logged.")+'</div>' +
           '<div><strong>Operational Notes:</strong> '+escapeHtml(e.opsNotes||"No note logged.")+'</div>' +
@@ -693,16 +664,6 @@ function appMain(){
       showToast("Enter the closer’s name before saving.");
       return;
     }
-    if(!ui.count.staffing.ok){
-      if(!(ui.count.staffing.detail||"").trim()){
-        showToast("Note who and what happened, or check “Everyone on time.”");
-        return;
-      }
-      if(!ui.count.staffing.coverage){
-        showToast("Choose whether coverage was arranged.");
-        return;
-      }
-    }
     if(!ui.count.frontDesk.ok && !(ui.count.frontDesk.detail||"").trim()){
       showToast("Describe the issue, or check “No issues.”");
       return;
@@ -726,11 +687,6 @@ function appMain(){
 
     var entry = {
       date:date, location:loc, closer: ui.count.closer.trim(),
-      staffing: {
-        ok: !!ui.count.staffing.ok,
-        detail: ui.count.staffing.ok ? "" : ui.count.staffing.detail.trim(),
-        coverage: ui.count.staffing.ok ? "" : ui.count.staffing.coverage
-      },
       frontDesk: {
         ok: !!ui.count.frontDesk.ok,
         detail: ui.count.frontDesk.ok ? "" : ui.count.frontDesk.detail.trim()
@@ -803,13 +759,6 @@ function appMain(){
     if(searchInput) searchInput.addEventListener("input", function(){ ui.count.search = searchInput.value; render(); });
     var reportDate = app.querySelector('[data-action="set-report-date"]');
     if(reportDate) reportDate.addEventListener("change", function(){ ui.dashboardDate = reportDate.value; render(); });
-
-    var staffToggle = app.querySelector('[data-action="toggle-staffing"]');
-    if(staffToggle) staffToggle.addEventListener("change", function(){ ui.count.staffing.ok = staffToggle.checked; render(); });
-    var staffDetail = app.querySelector('[data-action="set-staffing-detail"]');
-    if(staffDetail) staffDetail.addEventListener("input", function(){ ui.count.staffing.detail = staffDetail.value; });
-    var staffCoverage = app.querySelector('[data-action="set-staffing-coverage"]');
-    if(staffCoverage) staffCoverage.addEventListener("change", function(){ ui.count.staffing.coverage = staffCoverage.value; });
 
     var fdToggle = app.querySelector('[data-action="toggle-fd"]');
     if(fdToggle) fdToggle.addEventListener("change", function(){ ui.count.frontDesk.ok = fdToggle.checked; render(); });
