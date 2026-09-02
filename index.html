@@ -169,24 +169,15 @@ function appMain(){
     return {overlap:overlap, curTotal:curIds.length, prevTotal:prevIds.length, pct:pct, flag: curIds.length>=2 && pct>=0.8};
   }
   function blankFrontDesk(){
-    return {
-      delay: { ok: true, detail: "" },
-      unfinished: { ok: true, detail: "" },
-      guestIssue: { ok: true, detail: "" },
-      equipment: { ok: true, detail: "" }
-    };
+    return { ok: true, detail: "" };
   }
   function frontDeskAnyFlag(fd){
-    return !!(fd && (!fd.delay.ok || !fd.unfinished.ok || !fd.guestIssue.ok || !fd.equipment.ok));
+    return !!(fd && !fd.ok);
   }
   function frontDeskSummary(fd){
     if(!fd) return "No note logged.";
-    var lines = [];
-    if(!fd.delay.ok) lines.push("Delay: " + (fd.delay.detail||""));
-    if(!fd.unfinished.ok) lines.push("Unfinished: " + (fd.unfinished.detail||""));
-    if(!fd.guestIssue.ok) lines.push("Guest issue: " + (fd.guestIssue.detail||""));
-    if(!fd.equipment.ok) lines.push("Equipment: " + (fd.equipment.detail||""));
-    return lines.length ? lines.join("  ·  ") : "No delays, unfinished services, complaints, or equipment problems.";
+    if(fd.ok) return "No delays, unfinished services, guest issues, or equipment problems.";
+    return fd.detail || "";
   }
   function staffingSummary(s){
     if(!s) return "No note logged.";
@@ -347,11 +338,12 @@ function appMain(){
     }
     out += '</div>';
 
-    out += '<div class="card"><div class="card-head"><h3>Front Desk & Salon</h3></div>';
-    out += renderFdQuestion("delay", "No delays today", "Any service delays today?", "What caused the delay, and was the guest notified?");
-    out += renderFdQuestion("unfinished", "Nothing carried to tomorrow", "Any unfinished services carried to tomorrow?", "Which service, which guest/stylist, and why?");
-    out += renderFdQuestion("guestIssue", "No complaints or issues", "Any guest complaints or issues?", "What happened, and how was it resolved (or who still needs to follow up)?");
-    out += renderFdQuestion("equipment", "No equipment problems", "Any equipment problems today?", "What's broken, and has it been reported?");
+    out += '<div class="card"><div class="card-head"><h3>Front Desk & Salon</h3></div>' +
+      '<p class="helper" style="margin-top:-8px">Any delays, unfinished services, guest issues, or equipment problems?</p>' +
+      '<label class="check-row"><input type="checkbox" data-action="toggle-fd"'+(ui.count.frontDesk.ok?" checked":"")+'> No issues</label>';
+    if(!ui.count.frontDesk.ok){
+      out += '<textarea data-action="set-fd-detail" placeholder="What happened, and is it resolved or does someone still need to follow up?">'+escapeHtml(ui.count.frontDesk.detail)+'</textarea>';
+    }
     out += '</div>';
 
     out += '<div class="card"><div class="card-head"><h3>Restock Needed</h3></div>' +
@@ -393,18 +385,6 @@ function appMain(){
       '<button class="btn btn-primary" data-action="submit-count" '+(ui.saving?"disabled":"")+'>'+(ui.saving?"Saving…":(existing?"Update Tonight’s Count":"Save Tonight’s Count"))+'</button>' +
       '</div>';
     return out;
-  }
-
-  function renderFdQuestion(key, okLabel, question, placeholder){
-    var f = ui.count.frontDesk[key];
-    var html = '<div class="fd-question">' +
-      '<p class="helper" style="margin:0 0 6px;font-weight:700;color:var(--ink)">'+escapeHtml(question)+'</p>' +
-      '<label class="check-row"><input type="checkbox" data-action="toggle-fd" data-field="'+key+'"'+(f.ok?" checked":"")+'> '+escapeHtml(okLabel)+'</label>';
-    if(!f.ok){
-      html += '<textarea data-action="set-fd-detail" data-field="'+key+'" placeholder="'+escapeHtml(placeholder)+'">'+escapeHtml(f.detail)+'</textarea>';
-    }
-    html += '</div>';
-    return html;
   }
 
   function renderCatalogList(){
@@ -723,14 +703,9 @@ function appMain(){
         return;
       }
     }
-    var FD_LABELS = { delay: "the delay", unfinished: "the unfinished service", guestIssue: "the guest issue", equipment: "the equipment problem" };
-    var fdKeys = ["delay", "unfinished", "guestIssue", "equipment"];
-    for(var fi=0; fi<fdKeys.length; fi++){
-      var fdField = ui.count.frontDesk[fdKeys[fi]];
-      if(!fdField.ok && !(fdField.detail||"").trim()){
-        showToast("Describe " + FD_LABELS[fdKeys[fi]] + ", or check the box above it.");
-        return;
-      }
+    if(!ui.count.frontDesk.ok && !(ui.count.frontDesk.detail||"").trim()){
+      showToast("Describe the issue, or check “No issues.”");
+      return;
     }
     var ids = Object.keys(ui.count.selected);
     if(!ui.count.nothingToRestock && !ids.length){
@@ -757,10 +732,8 @@ function appMain(){
         coverage: ui.count.staffing.ok ? "" : ui.count.staffing.coverage
       },
       frontDesk: {
-        delay: { ok: !!ui.count.frontDesk.delay.ok, detail: ui.count.frontDesk.delay.ok ? "" : ui.count.frontDesk.delay.detail.trim() },
-        unfinished: { ok: !!ui.count.frontDesk.unfinished.ok, detail: ui.count.frontDesk.unfinished.ok ? "" : ui.count.frontDesk.unfinished.detail.trim() },
-        guestIssue: { ok: !!ui.count.frontDesk.guestIssue.ok, detail: ui.count.frontDesk.guestIssue.ok ? "" : ui.count.frontDesk.guestIssue.detail.trim() },
-        equipment: { ok: !!ui.count.frontDesk.equipment.ok, detail: ui.count.frontDesk.equipment.ok ? "" : ui.count.frontDesk.equipment.detail.trim() }
+        ok: !!ui.count.frontDesk.ok,
+        detail: ui.count.frontDesk.ok ? "" : ui.count.frontDesk.detail.trim()
       },
       restocks: restocks, nothingToRestock: !!ui.count.nothingToRestock,
       cleaning: ui.count.cleaningOk ? CLEANING_OK : ui.count.cleaningText.trim(),
@@ -838,12 +811,10 @@ function appMain(){
     var staffCoverage = app.querySelector('[data-action="set-staffing-coverage"]');
     if(staffCoverage) staffCoverage.addEventListener("change", function(){ ui.count.staffing.coverage = staffCoverage.value; });
 
-    app.querySelectorAll('[data-action="toggle-fd"]').forEach(function(cb){
-      cb.addEventListener("change", function(){ ui.count.frontDesk[cb.getAttribute("data-field")].ok = cb.checked; render(); });
-    });
-    app.querySelectorAll('[data-action="set-fd-detail"]').forEach(function(ta){
-      ta.addEventListener("input", function(){ ui.count.frontDesk[ta.getAttribute("data-field")].detail = ta.value; });
-    });
+    var fdToggle = app.querySelector('[data-action="toggle-fd"]');
+    if(fdToggle) fdToggle.addEventListener("change", function(){ ui.count.frontDesk.ok = fdToggle.checked; render(); });
+    var fdText = app.querySelector('[data-action="set-fd-detail"]');
+    if(fdText) fdText.addEventListener("input", function(){ ui.count.frontDesk.detail = fdText.value; });
 
     var cleanToggle = app.querySelector('[data-action="toggle-cleaning"]');
     if(cleanToggle) cleanToggle.addEventListener("change", function(){ ui.count.cleaningOk = cleanToggle.checked; render(); });
