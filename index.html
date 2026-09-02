@@ -179,6 +179,17 @@ function appMain(){
     if(fd.ok) return "No staffing/attendance issues, delays, unfinished services, guest issues, or equipment problems.";
     return fd.detail || "";
   }
+  function blankLateCancels(){
+    return { ok: true, detail: "" };
+  }
+  function lateCancelsAnyFlag(lc){
+    return !!(lc && !lc.ok);
+  }
+  function lateCancelsSummary(lc){
+    if(!lc) return "No note logged.";
+    if(lc.ok) return "No late cancels or no-shows that haven’t been charged.";
+    return lc.detail || "";
+  }
   /* ---------- ui (per-viewer, not persisted) ---------- */
   var CLEANING_OK = "Floors, trash, and all cleaning duties completed.";
   var OPS_OK = "Nothing to flag.";
@@ -187,6 +198,7 @@ function appMain(){
     count: {
       location: null, date: todayStr(), closer: "",
       frontDesk: blankFrontDesk(),
+      lateCancels: blankLateCancels(),
       cleaningOk: true, cleaningText: "",
       opsOk: true, opsText: "",
       catalogTab: null, search: "", selected: {}, nothingToRestock: false,
@@ -295,6 +307,7 @@ function appMain(){
       if(!ui.count.catalogTab || tabs.indexOf(ui.count.catalogTab)===-1) ui.count.catalogTab = tabs[0];
       ui.count.closer = existing ? (existing.closer||"") : "";
       ui.count.frontDesk = (existing && existing.frontDesk) ? JSON.parse(JSON.stringify(existing.frontDesk)) : blankFrontDesk();
+      ui.count.lateCancels = (existing && existing.lateCancels) ? JSON.parse(JSON.stringify(existing.lateCancels)) : blankLateCancels();
       ui.count.cleaningOk = existing ? (existing.cleaning === CLEANING_OK) : true;
       ui.count.cleaningText = (existing && existing.cleaning !== CLEANING_OK) ? existing.cleaning : "";
       ui.count.opsOk = existing ? (existing.opsNotes === OPS_OK) : true;
@@ -318,6 +331,14 @@ function appMain(){
       '<label class="check-row"><input type="checkbox" data-action="toggle-fd"'+(ui.count.frontDesk.ok?" checked":"")+'> No issues</label>';
     if(!ui.count.frontDesk.ok){
       out += '<textarea data-action="set-fd-detail" placeholder="What happened, and is it resolved or does someone still need to follow up?">'+escapeHtml(ui.count.frontDesk.detail)+'</textarea>';
+    }
+    out += '</div>';
+
+    out += '<div class="card"><div class="card-head"><h3>Late Cancels & No-Shows</h3></div>' +
+      '<p class="helper" style="margin-top:-8px">Any late cancels or no shows that haven’t been charged?</p>' +
+      '<label class="check-row"><input type="checkbox" data-action="toggle-lc"'+(ui.count.lateCancels.ok?" checked":"")+'> None</label>';
+    if(!ui.count.lateCancels.ok){
+      out += '<textarea data-action="set-lc-detail" placeholder="Guest name and reason (e.g., Jane D. — no-show, called after close).">'+escapeHtml(ui.count.lateCancels.detail)+'</textarea>';
     }
     out += '</div>';
 
@@ -442,10 +463,12 @@ function appMain(){
              (prev ? ' · compared to '+formatDateLong(prev.date)+' ('+escapeHtml(prev.closer||"unknown")+')' : ' · first night on record for this location') + '</p>';
 
       var fdFlag = frontDeskAnyFlag(entry.frontDesk);
+      var lcFlag = lateCancelsAnyFlag(entry.lateCancels);
       var cleanFlag = entry.cleaning && entry.cleaning !== CLEANING_OK;
       var opsFlag = entry.opsNotes && entry.opsNotes !== OPS_OK;
       out += '<div class="grid-2" style="margin-bottom:14px">' +
         '<div class="banner '+(fdFlag?"banner-warn":"banner-info")+'">'+(fdFlag?ICONS.warn:"")+'<div><strong>Front Desk & Salon</strong><br>'+escapeHtml(frontDeskSummary(entry.frontDesk))+'</div></div>' +
+        '<div class="banner '+(lcFlag?"banner-warn":"banner-info")+'">'+(lcFlag?ICONS.warn:"")+'<div><strong>Late Cancels & No-Shows</strong><br>'+escapeHtml(lateCancelsSummary(entry.lateCancels))+'</div></div>' +
         '<div class="banner '+(cleanFlag?"banner-warn":"banner-info")+'">'+(cleanFlag?ICONS.warn:"")+'<div><strong>Cleaning Duties</strong><br>'+escapeHtml(entry.cleaning||"No note logged.")+'</div></div>' +
         '<div class="banner '+(opsFlag?"banner-warn":"banner-info")+'">'+(opsFlag?ICONS.warn:"")+'<div><strong>Operational Notes</strong><br>'+escapeHtml(entry.opsNotes||"No note logged.")+'</div></div>' +
         '</div>';
@@ -499,9 +522,10 @@ function appMain(){
       var key = e.date+"|"+e.location;
       var open = !!ui.historyOpen[key];
       var fdFlag = frontDeskAnyFlag(e.frontDesk);
+      var lcFlag = lateCancelsAnyFlag(e.lateCancels);
       var cleanFlag = e.cleaning && e.cleaning !== CLEANING_OK;
       var opsFlag = e.opsNotes && e.opsNotes !== OPS_OK;
-      var notesFlag = fdFlag || cleanFlag || opsFlag;
+      var notesFlag = fdFlag || lcFlag || cleanFlag || opsFlag;
       out += '<tr><td><button class="history-toggle" data-action="toggle-history" data-key="'+key+'"><svg class="chev'+(open?" open":"")+'" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M9 6l6 6-6 6"></path></svg></button></td>' +
         '<td>'+formatDateLong(e.date)+'</td><td>'+escapeHtml(e.location)+'</td><td>'+escapeHtml(e.closer||"—")+'</td>' +
         '<td>'+(restocks.length ? '<span class="pill pill-reorder">'+restocks.length+'</span>' : '<span class="pill pill-ok">0</span>')+'</td>' +
@@ -511,6 +535,7 @@ function appMain(){
         out += '<tr class="detail-row"><td></td><td colspan="6">' +
           '<div class="stack" style="margin-bottom:12px">' +
           '<div><strong>Front Desk & Salon:</strong> '+escapeHtml(frontDeskSummary(e.frontDesk))+'</div>' +
+          '<div><strong>Late Cancels & No-Shows:</strong> '+escapeHtml(lateCancelsSummary(e.lateCancels))+'</div>' +
           '<div><strong>Cleaning Duties:</strong> '+escapeHtml(e.cleaning||"No note logged.")+'</div>' +
           '<div><strong>Operational Notes:</strong> '+escapeHtml(e.opsNotes||"No note logged.")+'</div>' +
           '</div>';
@@ -668,6 +693,10 @@ function appMain(){
       showToast("Describe the issue, or check “No issues.”");
       return;
     }
+    if(!ui.count.lateCancels.ok && !(ui.count.lateCancels.detail||"").trim()){
+      showToast("Add the guest name and reason, or check “None.”");
+      return;
+    }
     var ids = Object.keys(ui.count.selected);
     if(!ui.count.nothingToRestock && !ids.length){
       showToast("Flag at least one item to restock, or check “Nothing needs restocking tonight.”");
@@ -690,6 +719,10 @@ function appMain(){
       frontDesk: {
         ok: !!ui.count.frontDesk.ok,
         detail: ui.count.frontDesk.ok ? "" : ui.count.frontDesk.detail.trim()
+      },
+      lateCancels: {
+        ok: !!ui.count.lateCancels.ok,
+        detail: ui.count.lateCancels.ok ? "" : ui.count.lateCancels.detail.trim()
       },
       restocks: restocks, nothingToRestock: !!ui.count.nothingToRestock,
       cleaning: ui.count.cleaningOk ? CLEANING_OK : ui.count.cleaningText.trim(),
@@ -764,6 +797,11 @@ function appMain(){
     if(fdToggle) fdToggle.addEventListener("change", function(){ ui.count.frontDesk.ok = fdToggle.checked; render(); });
     var fdText = app.querySelector('[data-action="set-fd-detail"]');
     if(fdText) fdText.addEventListener("input", function(){ ui.count.frontDesk.detail = fdText.value; });
+
+    var lcToggle = app.querySelector('[data-action="toggle-lc"]');
+    if(lcToggle) lcToggle.addEventListener("change", function(){ ui.count.lateCancels.ok = lcToggle.checked; render(); });
+    var lcText = app.querySelector('[data-action="set-lc-detail"]');
+    if(lcText) lcText.addEventListener("input", function(){ ui.count.lateCancels.detail = lcText.value; });
 
     var cleanToggle = app.querySelector('[data-action="toggle-cleaning"]');
     if(cleanToggle) cleanToggle.addEventListener("change", function(){ ui.count.cleaningOk = cleanToggle.checked; render(); });
