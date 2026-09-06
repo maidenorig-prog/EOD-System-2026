@@ -426,6 +426,23 @@ function appMain(){
   }
 
   /* ---------- TAB: Reorder Dashboard ---------- */
+  function aggregateAllRestocks(){
+    var map = {};
+    STATE.entries.forEach(function(e){
+      if(e.nothingToRestock) return;
+      (e.restocks||[]).forEach(function(r){
+        var rec = map[r.id];
+        if(!rec){ rec = {id:r.id, count:0, locs:{}, lastDate:"", lastNote:""}; map[r.id] = rec; }
+        rec.count++;
+        rec.locs[e.location] = true;
+        if(!rec.lastDate || e.date > rec.lastDate){
+          rec.lastDate = e.date;
+          rec.lastNote = r.note || "";
+        }
+      });
+    });
+    return Object.keys(map).map(function(k){ return map[k]; });
+  }
   function renderDashboard(){
     var dates = allDatesDesc();
     if(!dates.length){
@@ -501,6 +518,32 @@ function appMain(){
       out += '<label style="margin-top:14px" for="order-text">Plain-text version (select all to copy)</label><textarea id="order-text" class="copy-box" rows="'+Math.min(allReorders.length+1,10)+'" readonly onclick="this.select()">'+escapeHtml(listText)+'</textarea>';
     }
     out += '</div>';
+
+    var totals = aggregateAllRestocks();
+    out += '<div class="card"><div class="card-head"><h2>Total Needs — All Nights Logged</h2></div>';
+    out += '<p class="helper" style="margin-top:-6px">Every item flagged on any saved count at either location, combined into one running list — shows what keeps coming up, not just tonight.</p>';
+    if(!totals.length){
+      out += '<div class="banner banner-good">No restock items have ever been flagged.</div>';
+    } else {
+      totals.sort(function(a,b){ return b.count - a.count; });
+      out += '<div class="table-wrap"><table><thead><tr><th>Category</th><th>Item</th><th>Times Flagged</th><th>Location(s)</th><th>Last Flagged</th><th>Last Note</th></tr></thead><tbody>';
+      totals.forEach(function(t){
+        var it = findCatalogItem(t.id);
+        var cat = it ? it.tab + (it.subcategory ? " · "+it.subcategory : "") : "—";
+        var locList = Object.keys(t.locs).join(", ");
+        out += '<tr><td>'+escapeHtml(cat)+'</td><td>'+escapeHtml(it?displayName(it):t.id)+'</td><td><span class="pill pill-reorder">'+t.count+'</span></td><td>'+escapeHtml(locList)+'</td><td>'+escapeHtml(formatDateLong(t.lastDate))+'</td><td>'+escapeHtml(t.lastNote)+'</td></tr>';
+      });
+      out += '</tbody></table></div>';
+      var totalListText = totals.map(function(t){
+        var it = findCatalogItem(t.id);
+        var name = it?displayName(it):t.id;
+        var cat = it ? it.tab : "";
+        return name+" ("+cat+") — flagged "+t.count+"x, last "+formatDateLong(t.lastDate)+(t.lastNote?": "+t.lastNote:"");
+      }).join("\n");
+      out += '<label style="margin-top:14px" for="total-order-text">Plain-text version (select all to copy)</label><textarea id="total-order-text" class="copy-box" rows="'+Math.min(totals.length+1,10)+'" readonly onclick="this.select()">'+escapeHtml(totalListText)+'</textarea>';
+    }
+    out += '</div>';
+
     return out;
   }
 
