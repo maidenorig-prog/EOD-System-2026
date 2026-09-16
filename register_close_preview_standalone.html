@@ -1,0 +1,711 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#faf9f5;color:#141413}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>Blo EOD System</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Fraunces:wght@500;600;700&family=Manrope:wght@500;600;700;800&family=IBM+Plex+Mono:wght@500;600&display=swap');
+
+/* ===== tokens (matched 1:1 to the live EOD app) ===== */
+:root{
+  --bg:#F7E3E7;
+  --surface:#FFFFFF;
+  --surface-alt:#FBF1F3;
+  --ink:#505155;
+  --ink-muted:#8D8E91;
+  --ink-faint:#B0B1B3;
+  --accent:#F3157F;
+  --accent-strong:#C21166;
+  --accent-soft:#FDD0E5;
+  --line:#F7CADB;
+  --line-strong:#F6B0CD;
+  --good:#2F7A4F;
+  --good-soft:#DCEEE1;
+  --warn:#9C6A0A;
+  --warn-soft:#F5E6C8;
+  --critical:#B0392A;
+  --critical-soft:#F6DAD3;
+  --focus:#4F6FE0;
+  --focus-soft:#E3E9FD;
+  --shadow:0 1px 2px rgba(80,81,85,0.08), 0 6px 20px -8px rgba(80,81,85,0.22);
+  --radius:14px;
+  --radius-sm:9px;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#221820; --surface:#2E2029; --surface-alt:#3A2733;
+    --ink:#FBEAF3; --ink-muted:#C9AFC0; --ink-faint:#957F8F;
+    --accent:#F9B1DB; --accent-strong:#FAC1E2; --accent-soft:#55123B;
+    --line:#3B2F38; --line-strong:#544550;
+    --good:#7BCB9A; --good-soft:#213A2A;
+    --warn:#E3B559; --warn-soft:#3B2F16;
+    --critical:#E28270; --critical-soft:#3D241E;
+    --focus:#8FA6FF; --focus-soft:#1C2540;
+    --shadow:0 1px 2px rgba(0,0,0,0.3), 0 10px 30px -10px rgba(0,0,0,0.5);
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#221820; --surface:#2E2029; --surface-alt:#3A2733;
+  --ink:#FBEAF3; --ink-muted:#C9AFC0; --ink-faint:#957F8F;
+  --accent:#F9B1DB; --accent-strong:#FAC1E2; --accent-soft:#55123B;
+  --line:#3B2F38; --line-strong:#544550;
+  --good:#7BCB9A; --good-soft:#213A2A;
+  --warn:#E3B559; --warn-soft:#3B2F16;
+  --critical:#E28270; --critical-soft:#3D241E;
+  --focus:#8FA6FF; --focus-soft:#1C2540;
+  --shadow:0 1px 2px rgba(0,0,0,0.3), 0 10px 30px -10px rgba(0,0,0,0.5);
+}
+
+*{box-sizing:border-box}
+body{
+  margin:0;
+  font-family:"Manrope",system-ui,-apple-system,"Segoe UI",sans-serif;
+  background:var(--bg);
+  color:var(--ink);
+  -webkit-font-smoothing:antialiased;
+}
+h1,h2,h3,.display{
+  font-family:"Fraunces",Georgia,"Times New Roman",serif;
+  font-weight:600; text-wrap:balance; letter-spacing:-0.01em;
+}
+.mono,input[type="number"]{
+  font-family:"IBM Plex Mono","SFMono-Regular",Menlo,Consolas,monospace;
+  font-variant-numeric:tabular-nums;
+}
+a{color:var(--accent)}
+button{font-family:inherit}
+
+/* ===== preview ribbon (not part of the real app) ===== */
+.preview-ribbon{
+  background:var(--focus-soft); border-bottom:1px solid var(--line);
+  padding:12px 20px; display:flex; gap:10px; align-items:flex-start;
+}
+.preview-ribbon svg{flex:none;width:18px;height:18px;margin-top:2px;color:var(--focus)}
+.preview-ribbon .pr-text b{color:var(--ink)}
+.preview-ribbon .pr-text{font-size:0.88rem;color:var(--ink-muted);max-width:70ch}
+
+/* ===== shell (copied from the live app) ===== */
+.shell{max-width:1040px;margin:0 auto;padding:0 20px 64px}
+.topbar{position:sticky;top:0;z-index:20;background:var(--bg);padding:22px 20px 0;border-bottom:1px solid var(--line)}
+.topbar-inner{max-width:1040px;margin:0 auto}
+.brand{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:4px}
+.brand .mark{font-family:"Fraunces",serif;font-weight:600;font-size:1.5rem;color:var(--ink)}
+.brand .loc{font-size:0.8rem;color:var(--ink-muted);letter-spacing:0.04em;text-transform:uppercase}
+.tagline{color:var(--ink-muted);font-size:0.92rem;margin:0 0 16px;max-width:60ch}
+.tabbar{display:flex;gap:4px;overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none}
+.tabbar::-webkit-scrollbar{display:none}
+.tab{display:flex;align-items:center;gap:8px;white-space:nowrap;padding:10px 14px;border:none;background:none;color:var(--ink-muted);font-weight:600;font-size:0.92rem;cursor:pointer;border-radius:10px 10px 0 0;border-bottom:2px solid transparent;margin-bottom:-1px}
+.tab svg{width:17px;height:17px;flex:none}
+.tab.active{color:var(--accent);border-bottom-color:var(--accent)}
+.tab:focus-visible,button:focus-visible,input:focus-visible,textarea:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
+
+main{padding-top:24px}
+.section-head{margin-bottom:18px}
+.section-head h1{font-size:1.4rem;margin:0 0 4px}
+.section-head p{margin:0;color:var(--ink-muted);font-size:0.92rem;max-width:62ch}
+
+.card{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);padding:20px;margin-bottom:18px}
+.card-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:14px;flex-wrap:wrap}
+.card-head h2{font-size:1.05rem;margin:0}
+.stack{display:flex;flex-direction:column;gap:14px}
+.row{display:flex;gap:12px;flex-wrap:wrap;align-items:center}
+.grid-2{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:14px}
+
+label{font-size:0.82rem;font-weight:600;color:var(--ink-muted);display:block;margin-bottom:5px}
+input[type="text"],input[type="date"],input[type="number"],textarea{width:100%;padding:10px 12px;border-radius:var(--radius-sm);border:1px solid var(--line-strong);background:var(--surface);color:var(--ink);font-size:0.95rem}
+.loc-picker{display:flex;gap:10px;flex-wrap:wrap}
+.loc-btn{padding:16px 22px;border-radius:var(--radius);border:1px solid var(--line-strong);background:var(--surface);color:var(--ink);font-weight:700;font-size:1rem;cursor:pointer;min-width:150px;text-align:left;transition:border-color .15s, box-shadow .15s}
+.loc-btn:hover{border-color:var(--accent)}
+.loc-btn .sub{display:block;font-weight:500;font-size:0.78rem;color:var(--ink-muted);margin-top:3px}
+.loc-btn.active{border-color:var(--accent);box-shadow:0 0 0 2px var(--accent-soft) inset}
+textarea{resize:vertical;min-height:70px}
+.field{min-width:160px}
+.field.grow{flex:1}
+.amount-wrap{position:relative}
+.amount-wrap .curr{position:absolute;left:12px;top:50%;transform:translateY(-50%);color:var(--ink-muted);font-family:"IBM Plex Mono",monospace;pointer-events:none}
+.amount-wrap input{padding-left:24px;text-align:right;font-size:1.05rem;font-weight:600}
+
+.btn{display:inline-flex;align-items:center;gap:8px;justify-content:center;padding:11px 18px;border-radius:999px;border:1px solid var(--line-strong);background:var(--surface);color:var(--ink);font-weight:700;font-size:0.92rem;cursor:pointer;transition:transform .08s ease, border-color .15s}
+.btn:active{transform:scale(0.98)}
+.btn-primary{background:var(--accent);border-color:var(--accent);color:#fff}
+.btn-primary:hover{background:var(--accent-strong);border-color:var(--accent-strong)}
+.btn-ghost{border-color:transparent;background:transparent;color:var(--ink-muted)}
+.btn-ghost:hover{background:var(--surface-alt)}
+.btn-sm{padding:7px 12px;font-size:0.82rem}
+.btn[disabled]{opacity:0.5;cursor:not-allowed}
+
+.banner{border-radius:var(--radius-sm);padding:12px 14px;font-size:0.88rem;display:flex;gap:10px;align-items:flex-start;border:1px solid var(--line)}
+.banner svg{flex:none;width:18px;height:18px;margin-top:1px}
+.banner-good{background:var(--good-soft);border-color:var(--good-soft);color:var(--good)}
+.banner-info{background:var(--surface-alt);color:var(--ink-muted)}
+
+.pill{display:inline-flex;align-items:center;gap:5px;padding:3px 10px;border-radius:999px;font-size:0.74rem;font-weight:800;letter-spacing:0.02em;text-transform:uppercase}
+.pill-ok{background:var(--good-soft);color:var(--good)}
+.pill-reorder{background:var(--critical-soft);color:var(--critical)}
+.pill-warn{background:var(--warn-soft);color:var(--warn)}
+.pill-neutral{background:var(--surface-alt);color:var(--ink-muted)}
+.pill-new{background:var(--accent);color:#fff}
+
+.check-row{display:flex;align-items:center;gap:9px;font-size:0.92rem;font-weight:600;color:var(--ink);cursor:pointer;margin-bottom:2px}
+.check-row input[type="checkbox"]{width:18px;height:18px;accent-color:var(--accent);cursor:pointer;flex:none}
+.helper{font-size:0.78rem;color:var(--ink-muted);margin-top:4px}
+
+/* ===== new: highlighted "proposed" card ===== */
+.new-card{border:1.5px dashed var(--accent);position:relative}
+.new-card .card-head h2{display:flex;align-items:center;gap:10px}
+
+/* ===== new: file drop controls ===== */
+.drop{
+  border:1.5px dashed var(--line-strong); border-radius:var(--radius-sm);
+  background:var(--surface-alt); padding:16px; text-align:center; cursor:pointer;
+  transition:border-color .15s, background .15s;
+}
+.drop:hover{border-color:var(--accent)}
+.drop.has-file{padding:0;border-style:solid;background:var(--surface);text-align:left;cursor:default}
+.drop input[type="file"]{display:none}
+.drop-empty svg{width:26px;height:26px;color:var(--ink-faint);margin-bottom:6px}
+.drop-empty p{margin:0;font-size:0.86rem;color:var(--ink-muted)}
+.drop-empty p b{color:var(--ink)}
+
+.thumb-row{display:flex;align-items:center;gap:12px;padding:10px}
+.thumb-row img{width:64px;height:64px;object-fit:cover;border-radius:var(--radius-sm);border:1px solid var(--line);flex:none}
+.thumb-meta{min-width:0;flex:1}
+.thumb-name{font-weight:600;font-size:0.88rem;overflow-wrap:break-word}
+.thumb-sub{font-size:0.78rem;color:var(--ink-muted)}
+
+.csv-row{display:flex;align-items:center;gap:12px;padding:14px}
+.csv-icon{flex:none;width:40px;height:40px;border-radius:var(--radius-sm);background:var(--good-soft);color:var(--good);display:flex;align-items:center;justify-content:center}
+.csv-icon svg{width:20px;height:20px}
+
+/* ===== new: Restock tab (copied component classes from the live app) ===== */
+.subtabbar{display:flex;gap:6px;overflow-x:auto;padding-bottom:2px;margin-bottom:12px;-webkit-overflow-scrolling:touch;scrollbar-width:none}
+.subtabbar::-webkit-scrollbar{display:none}
+.subtab{white-space:nowrap;padding:8px 14px;border-radius:999px;border:1px solid var(--line-strong);background:var(--surface);color:var(--ink-muted);font-weight:700;font-size:0.84rem;cursor:pointer}
+.subtab.active{background:var(--accent);border-color:var(--accent);color:#fff}
+.search-input{font-size:1rem;margin-bottom:12px}
+.catalog-list{max-height:340px;overflow-y:auto;border:1px solid var(--line);border-radius:var(--radius-sm);padding:4px}
+.catalog-item{width:100%;display:flex;align-items:center;gap:12px;padding:10px 10px;border:none;background:none;text-align:left;cursor:pointer;border-radius:8px;color:var(--ink)}
+.catalog-item:hover{background:var(--surface-alt)}
+.catalog-item.selected{background:var(--accent-soft)}
+.ci-check{flex:none;width:26px;height:26px;border-radius:50%;border:1.5px solid var(--line-strong);display:flex;align-items:center;justify-content:center;font-size:1rem;color:var(--ink-faint)}
+.catalog-item.selected .ci-check{background:var(--accent);border-color:var(--accent);color:#fff}
+.ci-check svg{width:15px;height:15px}
+.ci-text{display:flex;flex-direction:column;gap:1px;min-width:0}
+.ci-name{font-weight:600;font-size:0.94rem;overflow-wrap:break-word}
+.ci-sub{font-size:0.76rem;color:var(--ink-muted)}
+.restock-selected h4{font-size:0.85rem;margin:0 0 8px;font-family:"Manrope";font-weight:800;color:var(--ink-muted);text-transform:uppercase;letter-spacing:0.04em}
+.restock-row{display:grid;grid-template-columns:1fr 160px auto;gap:10px;align-items:center;padding:8px 0;border-bottom:1px solid var(--line)}
+.restock-row:last-child{border-bottom:none}
+.rr-name{font-weight:600;font-size:0.92rem}
+.rr-tab{display:inline-block;margin-left:6px;font-size:0.72rem;font-weight:700;color:var(--accent);text-transform:uppercase;letter-spacing:0.03em}
+.rr-note{font-size:0.85rem;padding:7px 9px}
+
+/* ===== new: CSV per-day summary table ===== */
+table{width:100%;border-collapse:collapse;font-size:0.9rem}
+.table-wrap{overflow-x:auto}
+th{text-align:left;font-size:0.72rem;letter-spacing:0.06em;text-transform:uppercase;color:var(--ink-muted);padding:8px 10px;border-bottom:1px solid var(--line-strong);white-space:nowrap}
+td{padding:9px 10px;border-bottom:1px solid var(--line);vertical-align:middle;font-family:"IBM Plex Mono",monospace;font-variant-numeric:tabular-nums;white-space:nowrap}
+td:first-child{font-family:"Manrope",sans-serif}
+td.num{text-align:right}
+tbody tr:last-child td{border-bottom:none}
+tfoot td{border-top:2px solid var(--line-strong);border-bottom:none;padding-top:10px}
+@media (max-width:640px){
+  .restock-row{grid-template-columns:1fr;gap:6px}
+}
+
+@media (max-width:640px){
+  .shell{padding:0 14px 48px}
+  .topbar{padding:16px 14px 0}
+  .card{padding:16px}
+}
+@media (prefers-reduced-motion: reduce){ *{transition:none !important;animation:none !important} }
+</style>
+
+<div class="preview-ribbon">
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><path d="M12 8v5"></path><path d="M12 16h.01"></path></svg>
+  <div class="pr-text"><b>Preview only — nothing here is live yet.</b> This shows how four new fields would look inside tonight's real EOD form: Over/Short, Deposit Amount, a photo of the closed-register screen, and the daily dashboard CSV export — right alongside Restock Needed, which stays exactly where it is today. Nothing on the actual site changes until this is approved and built in.</div>
+</div>
+
+<div class="topbar">
+  <div class="topbar-inner">
+    <div class="brand">
+      <span class="mark">Blo Blow Dry Bar</span>
+      <span class="loc" id="topbar-loc">Woodsons</span>
+    </div>
+    <p class="tagline">End-of-day count — closing stylist checklist</p>
+    <div class="tabbar">
+      <button class="tab active"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"></rect><path d="M16 2v4M8 2v4M3 10h18"></path></svg>Tonight's Count</button>
+      <button class="tab"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"></path><path d="M7 15l4-4 3 3 5-6"></path></svg>Reorder Dashboard</button>
+      <button class="tab"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v5h5"></path><path d="M3.05 13A9 9 0 106 5.3L3 8"></path></svg>History</button>
+      <button class="tab"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 11-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 11-4 0v-.09A1.65 1.65 0 008.6 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 11-2.83-2.83l.06-.06A1.65 1.65 0 004.6 15a1.65 1.65 0 00-1.51-1H3a2 2 0 110-4h.09A1.65 1.65 0 004.6 8.6a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 112.83-2.83l.06.06A1.65 1.65 0 008.6 4.6a1.65 1.65 0 001-1.51V3a2 2 0 114 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 112.83 2.83l-.06.06A1.65 1.65 0 0019.4 8.6a1.65 1.65 0 001.51 1H21a2 2 0 110 4h-.09a1.65 1.65 0 00-1.51 1z"></path></svg>Manage</button>
+      <button class="tab"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"></path><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"></path></svg>Guide</button>
+    </div>
+  </div>
+</div>
+
+<div class="shell">
+  <main>
+    <div id="panel-count">
+    <div class="section-head">
+      <h1>End of Day (EOD) Operational Updates</h1>
+    </div>
+
+    <!-- existing card, for context — matches the real location picker -->
+    <div class="card">
+      <div class="loc-picker" id="loc-picker">
+        <button type="button" class="loc-btn active" data-loc="Woodsons">Woodsons<span class="sub">Last logged 9/10</span></button>
+        <button type="button" class="loc-btn" data-loc="Kingwood">Kingwood<span class="sub">Last logged 9/10</span></button>
+      </div>
+    </div>
+
+    <!-- existing card, for context -->
+    <div class="card">
+      <div class="row">
+        <div class="field">
+          <label for="tc-date">Date</label>
+          <input type="date" id="tc-date" value="2026-09-11">
+        </div>
+        <div class="field">
+          <label>Location</label>
+          <div class="mono" id="tc-location" style="padding:10px 0;font-weight:700"><span id="loc-label-count">Woodsons</span></div>
+        </div>
+        <div class="field grow">
+          <label for="tc-closer">Closer name</label>
+          <input type="text" id="tc-closer" placeholder="Who's closing tonight?">
+        </div>
+      </div>
+    </div>
+
+    <!-- existing card, for context -->
+    <div class="card">
+      <div class="card-head"><h2>Front Desk &amp; Salon</h2></div>
+      <p class="helper" style="margin:-8px 0 10px">Any staffing/attendance issues, delays, unfinished services, guest issues, or equipment problems?</p>
+      <label class="check-row"><input type="checkbox" id="fd-check" checked> No issues</label>
+      <textarea id="fd-text" placeholder="What happened?" hidden></textarea>
+    </div>
+
+    <!-- existing card, for context -->
+    <div class="card">
+      <div class="card-head"><h2>Late Cancels &amp; No-Shows</h2></div>
+      <p class="helper" style="margin:-8px 0 10px">Any late cancels or no-shows that haven't been charged?</p>
+      <label class="check-row"><input type="checkbox" id="lc-check" checked> None</label>
+      <textarea id="lc-text" placeholder="Guest name + reason" hidden></textarea>
+    </div>
+
+    <!-- existing card, for context — Restock Needed stays here too, kept in sync with the Restock tab -->
+    <div class="card">
+      <div class="card-head"><h2>Restock Needed</h2></div>
+      <p class="helper" style="margin:-8px 0 10px">Search each category and flag anything that actually needs to be reordered.</p>
+      <div class="subtabbar" id="restock-subtabbar-tc">
+        <button type="button" class="subtab active" data-cat="Products">Products</button>
+        <button type="button" class="subtab" data-cat="Stations">Stations</button>
+        <button type="button" class="subtab" data-cat="Travel-Minis">Travel-Minis</button>
+        <button type="button" class="subtab" data-cat="Bar Supplies">Bar Supplies</button>
+        <button type="button" class="subtab" data-cat="Makeup">Makeup</button>
+      </div>
+      <input type="text" class="search-input" id="restock-search-tc" placeholder="Search products…">
+      <div class="catalog-list" id="restock-catalog-tc"></div>
+      <p class="helper" id="restock-catalog-count-tc" style="margin-top:6px"></p>
+      <div class="restock-selected" style="margin-top:16px">
+        <h4>Selected — <span id="restock-count-tc">0</span></h4>
+        <div id="restock-selected-list-tc"></div>
+        <p class="helper" id="restock-empty-note-tc">Nothing flagged yet tonight.</p>
+      </div>
+    </div>
+
+    <!-- existing card, for context -->
+    <div class="card">
+      <div class="card-head"><h2>Cleaning Duties</h2></div>
+      <p class="helper" style="margin:-8px 0 10px">Floors, trash, all cleaning duties completed?</p>
+      <label class="check-row"><input type="checkbox" id="cd-check" checked> Yes — all done</label>
+      <textarea id="cd-text" placeholder="What's left?" hidden></textarea>
+    </div>
+
+    <!-- existing card, for context — now interactive like the real form -->
+    <div class="card">
+      <div class="card-head"><h2>Operational Notes</h2></div>
+      <p class="helper" style="margin:-8px 0 10px">Staff issues, equipment problems, unusual situations, anyone asking for the owner — anything to flag, or "none"?</p>
+      <label class="check-row"><input type="checkbox" id="opnotes-check" checked> Nothing to flag</label>
+      <textarea id="opnotes-text" placeholder="What happened?" hidden></textarea>
+    </div>
+
+    <!-- NEW: the four fields being proposed -->
+    <div class="card new-card">
+      <div class="card-head">
+        <h2><span class="pill pill-new">New</span>&nbsp; Register Close</h2>
+      </div>
+      <p class="helper" style="margin:-6px 0 16px">From tonight's closed-register screen — type both numbers, attach a photo of the screen as the audit record, and upload the day's Daily Dashboard file for this bar. That makes this the one nightly stop.</p>
+
+      <div class="grid-2">
+        <div class="field">
+          <label for="rc-overshort">Over / Short ($)</label>
+          <div class="amount-wrap">
+            <span class="curr">$</span>
+            <input type="number" id="rc-overshort" step="0.01" placeholder="0.00" value="0.00">
+          </div>
+          <div id="rc-overshort-pill" style="margin-top:8px"><span class="pill pill-neutral">Enter tonight's amount</span></div>
+        </div>
+        <div class="field">
+          <label for="rc-deposit">Deposit Amount ($)</label>
+          <div class="amount-wrap">
+            <span class="curr">$</span>
+            <input type="number" id="rc-deposit" step="0.01" min="0" placeholder="0.00" value="0.00">
+          </div>
+          <p class="helper">Cash deposit going to the bank tonight.</p>
+        </div>
+      </div>
+
+      <div class="grid-2" style="margin-top:18px">
+        <div class="field">
+          <label>Closed-Register Screenshot</label>
+          <label class="drop" id="rc-photo-drop">
+            <input type="file" id="rc-photo-input" accept="image/*">
+            <div class="drop-empty" id="rc-photo-empty">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"></rect><circle cx="9" cy="9" r="2"></circle><path d="M21 15l-5-5L5 21"></path></svg>
+              <p><b>Tap to attach a photo</b><br>of the closed-register screen</p>
+            </div>
+            <div class="thumb-row" id="rc-photo-filled" hidden>
+              <img id="rc-photo-img" alt="Closed-register screenshot">
+              <div class="thumb-meta">
+                <div class="thumb-name" id="rc-photo-name"></div>
+                <div class="thumb-sub" id="rc-photo-size"></div>
+              </div>
+              <button type="button" class="btn btn-ghost btn-sm" id="rc-photo-remove">Remove</button>
+            </div>
+          </label>
+          <p class="helper" style="margin-top:6px">Saved as the audit record — kept alongside the typed amount for anyone reviewing the close later.</p>
+        </div>
+        <div class="field">
+          <label>Daily Dashboard Export</label>
+          <label class="drop" id="rc-csv-drop">
+            <input type="file" id="rc-csv-input" accept=".csv,text/csv">
+            <div class="drop-empty" id="rc-csv-empty">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"></path><path d="M14 2v6h6"></path></svg>
+              <p><b>Tap to upload</b><br>this bar's Daily Dashboard file (.csv) for today</p>
+            </div>
+            <div class="csv-row" id="rc-csv-filled" hidden>
+              <div class="csv-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"></path><path d="M14 2v6h6"></path></svg></div>
+              <div class="thumb-meta">
+                <div class="thumb-name" id="rc-csv-name"></div>
+                <div class="thumb-sub" id="rc-csv-size"></div>
+              </div>
+              <button type="button" class="btn btn-ghost btn-sm" id="rc-csv-remove">Remove</button>
+            </div>
+          </label>
+        </div>
+      </div>
+
+      <div id="csv-summary-wrap" style="margin-top:18px" hidden>
+        <label style="margin-bottom:8px">Read from the Daily Dashboard file — Revenue, Total Bookings, Retail Sales, New Memberships, Membership Dues per day</label>
+        <div id="csv-summary"></div>
+      </div>
+    </div>
+
+    <button class="btn btn-primary" style="width:100%;padding:14px" disabled>Save Tonight's Count</button>
+    <p class="helper" style="text-align:center;margin-top:10px">Button is inert in this preview — nothing saves here.</p>
+    </div>
+  </main>
+</div>
+<script>
+(function(){
+  // Saved field names (for whenever this actually writes to the system):
+  // Over/Short -> cashOverShort, Deposit -> depositAmount,
+  // Photo -> registerPhotoUrl, Daily Dashboard CSV -> dashboardCsvUrl.
+  // Keep "cash"/"deposit"/"overShort"/"photo"/"csv" in each name so the
+  // morning reader can find them — see the Register Close SOP, Section 6.
+  var DEMO_PHOTO_SRC = "data:image/jpeg;base64,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";
+  var DEMO_PHOTO_NAME = "kingwood-eod-register-9-10.jpg";
+  var DEMO_PHOTO_SIZE = "28.3 KB";
+  var DEMO_CSV_NAME = "blo-dashboard-export-week-of-9-7.csv";
+  var DEMO_CSV_TEXT = "Date,Revenue,Total Bookings,Retail Sales,New Memberships,Membership Dues\n" +
+    "2026-09-05,4820.50,34,412.00,2,780.00\n" +
+    "2026-09-06,5390.25,39,528.75,1,720.00\n" +
+    "2026-09-08,3980.00,29,375.50,0,660.00\n" +
+    "2026-09-09,6125.75,42,601.20,3,900.00\n" +
+    "2026-09-10,4750.00,31,450.00,1,750.00\n";
+  var osInput = document.getElementById('rc-overshort');
+  var osPill = document.getElementById('rc-overshort-pill');
+  function fmt(n){ return '$' + Math.abs(n).toFixed(2); }
+  function renderOS(){
+    var raw = osInput.value.trim();
+    if(raw === ''){ osPill.innerHTML = '<span class="pill pill-neutral">Enter tonight\'s amount</span>'; return; }
+    var n = parseFloat(raw);
+    if(isNaN(n)){ osPill.innerHTML = '<span class="pill pill-neutral">Enter tonight\'s amount</span>'; return; }
+    if(n === 0){ osPill.innerHTML = '<span class="pill pill-ok">Balanced</span>'; }
+    else if(n < 0){ osPill.innerHTML = '<span class="pill pill-reorder">Short ' + fmt(n) + '</span>'; }
+    else { osPill.innerHTML = '<span class="pill pill-warn">Over ' + fmt(n) + '</span>'; }
+  }
+  osInput.addEventListener('input', renderOS);
+  renderOS();
+
+  function humanSize(bytes){
+    if(bytes < 1024) return bytes + ' B';
+    if(bytes < 1024*1024) return (bytes/1024).toFixed(1) + ' KB';
+    return (bytes/(1024*1024)).toFixed(1) + ' MB';
+  }
+
+  // photo attach
+  var photoInput = document.getElementById('rc-photo-input');
+  var photoDrop = document.getElementById('rc-photo-drop');
+  var photoEmpty = document.getElementById('rc-photo-empty');
+  var photoFilled = document.getElementById('rc-photo-filled');
+  var photoImg = document.getElementById('rc-photo-img');
+  var photoName = document.getElementById('rc-photo-name');
+  var photoSize = document.getElementById('rc-photo-size');
+  document.getElementById('rc-photo-remove').addEventListener('click', function(e){
+    e.preventDefault(); e.stopPropagation();
+    photoInput.value = '';
+    photoDrop.classList.remove('has-file');
+    photoEmpty.hidden = false; photoFilled.hidden = true;
+  });
+  photoInput.addEventListener('change', function(){
+    var f = photoInput.files && photoInput.files[0];
+    if(!f) return;
+    var reader = new FileReader();
+    reader.onload = function(e){
+      photoImg.src = e.target.result;
+      photoName.textContent = f.name;
+      photoSize.textContent = humanSize(f.size);
+      photoDrop.classList.add('has-file');
+      photoEmpty.hidden = true; photoFilled.hidden = false;
+    };
+    reader.readAsDataURL(f);
+  });
+
+  // pre-filled with a real closed-register screenshot, to show the attach flow already in use
+  photoImg.src = DEMO_PHOTO_SRC;
+  photoName.textContent = DEMO_PHOTO_NAME;
+  photoSize.textContent = DEMO_PHOTO_SIZE;
+  photoDrop.classList.add('has-file');
+  photoEmpty.hidden = true; photoFilled.hidden = false;
+
+  // checklist cards — unchecking any of these reveals a note box, matching the real form
+  [['fd-check','fd-text'], ['lc-check','lc-text'], ['cd-check','cd-text'], ['opnotes-check','opnotes-text']].forEach(function(pair){
+    var check = document.getElementById(pair[0]);
+    var text = document.getElementById(pair[1]);
+    check.addEventListener('change', function(){
+      text.hidden = check.checked;
+      if(!check.checked){ text.focus(); }
+    });
+  });
+
+  // location picker — same Register Close card works for either location
+  document.querySelectorAll('#loc-picker .loc-btn').forEach(function(btn){
+    btn.addEventListener('click', function(){
+      document.querySelectorAll('#loc-picker .loc-btn').forEach(function(b){ b.classList.remove('active'); });
+      btn.classList.add('active');
+      var loc = btn.getAttribute('data-loc');
+      document.getElementById('loc-label-count').textContent = loc;
+      document.getElementById('topbar-loc').textContent = loc;
+    });
+  });
+
+  // csv upload
+  var csvInput = document.getElementById('rc-csv-input');
+  var csvDrop = document.getElementById('rc-csv-drop');
+  var csvEmpty = document.getElementById('rc-csv-empty');
+  var csvFilled = document.getElementById('rc-csv-filled');
+  var csvName = document.getElementById('rc-csv-name');
+  var csvSize = document.getElementById('rc-csv-size');
+  var csvSummaryWrap = document.getElementById('csv-summary-wrap');
+  var csvSummaryEl = document.getElementById('csv-summary');
+
+  // --- tiny CSV parser: handles quoted fields, doesn't need a library for this ---
+  function parseCSV(text){
+    var lines = text.split(/\r\n|\n|\r/).filter(function(l){ return l.trim().length; });
+    if(!lines.length) return { headers: [], rows: [] };
+    function splitLine(line){
+      var out = [], cur = '', inQuotes = false;
+      for(var i=0;i<line.length;i++){
+        var c = line[i];
+        if(c === '"'){
+          if(inQuotes && line[i+1] === '"'){ cur += '"'; i++; }
+          else { inQuotes = !inQuotes; }
+        } else if(c === ',' && !inQuotes){ out.push(cur); cur = ''; }
+        else { cur += c; }
+      }
+      out.push(cur);
+      return out.map(function(s){ return s.trim(); });
+    }
+    return { headers: splitLine(lines[0]), rows: lines.slice(1).map(splitLine) };
+  }
+
+  var METRIC_COLUMNS = [
+    { key: 'Revenue', money: true, synonyms: ['revenue', 'total revenue', 'gross revenue', 'sales revenue', 'service revenue'] },
+    { key: 'Total Bookings', money: false, synonyms: ['total bookings', 'bookings', 'appointments', 'total appointments', 'booking count'] },
+    { key: 'Retail Sales', money: true, synonyms: ['retail sales', 'retail', 'product sales'] },
+    { key: 'New Memberships', money: false, synonyms: ['new memberships', 'new members', 'memberships sold', 'new membership sales'] },
+    { key: 'Membership Dues', money: true, synonyms: ['membership dues', 'dues', 'membership revenue', 'recurring dues'] }
+  ];
+
+  function findColumn(headers, synonyms){
+    var lower = headers.map(function(h){ return h.toLowerCase(); });
+    for(var i=0;i<synonyms.length;i++){
+      var idx = lower.indexOf(synonyms[i]);
+      if(idx !== -1) return idx;
+    }
+    for(var i=0;i<synonyms.length;i++){
+      for(var j=0;j<lower.length;j++){
+        if(lower[j].indexOf(synonyms[i]) !== -1) return j;
+      }
+    }
+    return -1;
+  }
+
+  function toNumber(v){
+    var n = parseFloat(String(v == null ? '' : v).replace(/[^0-9.\-]/g, ''));
+    return isNaN(n) ? null : n;
+  }
+  function fmtMoney(n){ return n == null ? '—' : '$' + n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
+  function fmtNum(n){ return n == null ? '—' : n.toLocaleString(); }
+
+  function renderCsvSummary(text){
+    var parsed = parseCSV(text);
+    var headers = parsed.headers;
+    var dateIdx = findColumn(headers, ['date', 'day']);
+    var colIdx = {};
+    METRIC_COLUMNS.forEach(function(m){ colIdx[m.key] = findColumn(headers, m.synonyms); });
+    var anyFound = dateIdx !== -1 && METRIC_COLUMNS.some(function(m){ return colIdx[m.key] !== -1; });
+
+    if(!anyFound){
+      csvSummaryEl.innerHTML = '<p class="helper">Couldn\'t find Date/Revenue/Bookings-style columns in this file — column names may need to match what the dashboard actually exports.</p>';
+      csvSummaryWrap.hidden = false;
+      return;
+    }
+
+    var totals = {}; METRIC_COLUMNS.forEach(function(m){ totals[m.key] = 0; });
+    var rowsHtml = parsed.rows.map(function(r){
+      var cells = '<td>' + (dateIdx !== -1 ? (r[dateIdx] || '—') : '—') + '</td>';
+      METRIC_COLUMNS.forEach(function(m){
+        var idx = colIdx[m.key];
+        var num = idx !== -1 ? toNumber(r[idx]) : null;
+        if(num != null) totals[m.key] += num;
+        cells += '<td class="num">' + (m.money ? fmtMoney(num) : fmtNum(num)) + '</td>';
+      });
+      return '<tr>' + cells + '</tr>';
+    }).join('');
+
+    var footHtml = '';
+    if(parsed.rows.length > 1){
+      footHtml = '<tfoot><tr><td style="font-weight:800">Total</td>' +
+        METRIC_COLUMNS.map(function(m){
+          return '<td class="num" style="font-weight:800">' + (m.money ? fmtMoney(totals[m.key]) : fmtNum(totals[m.key])) + '</td>';
+        }).join('') + '</tr></tfoot>';
+    }
+
+    csvSummaryEl.innerHTML = '<div class="table-wrap"><table><thead><tr><th>Date</th><th>Revenue</th><th>Total Bookings</th><th>Retail Sales</th><th>New Memberships</th><th>Membership Dues</th></tr></thead><tbody>' +
+      rowsHtml + '</tbody>' + footHtml + '</table></div>';
+    csvSummaryWrap.hidden = false;
+  }
+
+  document.getElementById('rc-csv-remove').addEventListener('click', function(e){
+    e.preventDefault(); e.stopPropagation();
+    csvInput.value = '';
+    csvDrop.classList.remove('has-file');
+    csvEmpty.hidden = false; csvFilled.hidden = true;
+    csvSummaryWrap.hidden = true;
+    csvSummaryEl.innerHTML = '';
+  });
+  csvInput.addEventListener('change', function(){
+    var f = csvInput.files && csvInput.files[0];
+    if(!f) return;
+    csvName.textContent = f.name;
+    csvSize.textContent = humanSize(f.size);
+    csvDrop.classList.add('has-file');
+    csvEmpty.hidden = true; csvFilled.hidden = false;
+    var reader = new FileReader();
+    reader.onload = function(e){ renderCsvSummary(String(e.target.result || '')); };
+    reader.readAsText(f);
+  });
+
+  // pre-filled with a sample dashboard export, so the per-day breakdown shows right away
+  csvName.textContent = DEMO_CSV_NAME;
+  csvSize.textContent = humanSize(DEMO_CSV_TEXT.length);
+  csvDrop.classList.add('has-file');
+  csvEmpty.hidden = true; csvFilled.hidden = false;
+  renderCsvSummary(DEMO_CSV_TEXT);
+
+  // ===== Restock — lives in BOTH Tonight's Count and its own Restock tab, kept in sync =====
+  var CATALOG = {"Products":[{"id":"products-unite-7-seconds-masque-16oz","name":"UNITE 7 Seconds Masque (16oz)","sub":"Back Bar only"},{"id":"products-unite-7-seconds-shampoo-32l","name":"UNITE 7 Seconds Shampoo 32L","sub":"Back Bar only"},{"id":"products-unite-7seconds-conditioner-32l","name":"UNITE 7Seconds Conditioner 32L","sub":"Back Bar only"},{"id":"products-unite-blonda-conditioner-32l","name":"UNITE Blonda Conditioner 32L","sub":"Back Bar only"},{"id":"products-unite-blonda-daily-shampoo-32l","name":"UNITE Blonda Daily Shampoo 32L","sub":"Back Bar only"},{"id":"products-unite-blonda-toning-shampoo-32l","name":"UNITE Blonda Toning Shampoo 32L","sub":"Back Bar only"},{"id":"products-unite-boosta-conditioner","name":"UNITE Boosta Conditioner","sub":"Back Bar only"},{"id":"products-unite-boosta-shampoo-32l","name":"UNITE Boosta Shampoo 32L","sub":"Back Bar only"},{"id":"products-color-wow-dream-coat","name":"Color Wow Dream Coat","sub":"Back Bar only"},{"id":"products-color-wow-dream-coat-curly-bb","name":"Color Wow Dream Coat Curly BB","sub":"Back Bar only"},{"id":"products-color-wow-dream-coat-extra-bb","name":"Color Wow Dream Coat Extra BB","sub":"Back Bar only"},{"id":"products-color-wow-dream-filter-bb","name":"Color Wow Dream Filter BB","sub":"Back Bar only"},{"id":"products-unite-lazer-straight-conditioner-32l","name":"UNITE Lazer Straight Conditioner 32L","sub":"Back Bar only"},{"id":"products-unite-lazer-straight-shampoo-32l","name":"UNITE Lazer Straight Shampoo 32L","sub":"Back Bar only"},{"id":"products-unite-u-lux-conditioner-32l","name":"UNITE U Lux Conditioner 32L","sub":"Back Bar only"},{"id":"products-unite-u-lux-shampoo-32l","name":"UNITE U Lux Shampoo 32L","sub":"Back Bar only"},{"id":"products-unite-weekender-32l","name":"UNITE Weekender 32L","sub":"Back Bar only"},{"id":"products-unite-7-seconds-anti-frizz","name":"UNITE 7 Seconds Anti - Frizz","sub":"Retail + Back Bar"},{"id":"products-unite-7-seconds-blowout-creme","name":"UNITE 7 Seconds Blowout Creme","sub":"Retail + Back Bar"},{"id":"products-unite-7-seconds-detangler","name":"UNITE 7 Seconds Detangler","sub":"Retail + Back Bar"},{"id":"products-unite-7-seconds-glossing-spray","name":"UNITE 7 Seconds Glossing Spray","sub":"Retail + Back Bar"},{"id":"products-unite-beach-day","name":"UNITE Beach Day","sub":"Retail + Back Bar"},{"id":"products-unite-blonda-conditioner","name":"UNITE Blonda Conditioner","sub":"Retail + Back Bar"},{"id":"products-unite-blonda-fix","name":"UNITE Blonda Fix","sub":"Retail + Back Bar"},{"id":"products-unite-blonda-oil","name":"UNITE Blonda Oil","sub":"Retail + Back Bar"},{"id":"products-unite-blow-set","name":"UNITE Blow & Set","sub":"Retail + Back Bar"},{"id":"products-unite-boing-conditioner","name":"UNITE Boing Conditioner","sub":"Retail + Back Bar"},{"id":"products-unite-boing-defining-curling-cream","name":"UNITE Boing Defining Curling Cream","sub":"Retail + Back Bar"},{"id":"products-unite-boing-leave-in","name":"UNITE Boing Leave-in","sub":"Retail + Back Bar"},{"id":"products-unite-boing-moisture-curl-cream","name":"UNITE Boing Moisture Curl Cream","sub":"Retail + Back Bar"},{"id":"products-unite-boing-shampoo","name":"UNITE Boing Shampoo","sub":"Retail + Back Bar"},{"id":"products-unite-boosta-conditioner-2","name":"UNITE Boosta Conditioner","sub":"Retail + Back Bar"},{"id":"products-unite-boosta-finishing-hairspray","name":"UNITE Boosta Finishing Hairspray","sub":"Retail + Back Bar"},{"id":"products-unite-boosta-thickening-cr-me","name":"UNITE Boosta Thickening Crème","sub":"Retail + Back Bar"},{"id":"products-unite-boosta-volumizing-spray","name":"UNITE Boosta Volumizing Spray","sub":"Retail + Back Bar"},{"id":"products-unite-boosta-serum","name":"UNITE Boosta+ Serum","sub":"Retail + Back Bar"},{"id":"products-color-wow-cocktail-carb-6-7-oz","name":"Color Wow Cocktail Carb 6.7 oz","sub":"Retail + Back Bar"},{"id":"products-color-wow-cocktail-coconut-6-7-oz","name":"Color Wow Cocktail Coconut 6.7 oz","sub":"Retail + Back Bar"},{"id":"products-color-wow-cocktail-kale-6-7-oz","name":"Color Wow Cocktail Kale 6.7 oz","sub":"Retail + Back Bar"},{"id":"products-color-wow-color-control-blue-6-8oz","name":"Color Wow Color Control (Blue) 6.8oz","sub":"Retail + Back Bar"},{"id":"products-color-wow-color-control-purple-6-8oz","name":"Color Wow Color Control (Purple) 6.8oz","sub":"Retail + Back Bar"},{"id":"products-color-wow-color-security-conditioner-fine-normal","name":"Color Wow Color Security Conditioner (fine-normal)","sub":"Retail + Back Bar"},{"id":"products-color-wow-color-security-conditioner-normal-thick","name":"Color Wow Color Security Conditioner (normal-thick)","sub":"Retail + Back Bar"},{"id":"products-color-wow-color-security-shampoo","name":"Color Wow Color Security Shampoo","sub":"Retail + Back Bar"},{"id":"products-unite-conundrum-paste","name":"UNITE Conundrum Paste","sub":"Retail + Back Bar"},{"id":"products-unite-creamy-paste","name":"UNITE Creamy Paste","sub":"Retail + Back Bar"},{"id":"products-color-wow-cult-favorite-10-oz","name":"Color Wow Cult Favorite 10 oz","sub":"Retail + Back Bar"},{"id":"products-color-wow-dreaming-mask","name":"Color Wow Dreaming Mask","sub":"Retail + Back Bar"},{"id":"products-unite-elevate-mousse","name":"UNITE Elevate Mousse","sub":"Retail + Back Bar"},{"id":"products-unite-expanda-dust","name":"UNITE Expanda Dust","sub":"Retail + Back Bar"},{"id":"products-unite-expanda-volume","name":"UNITE Expanda Volume","sub":"Retail + Back Bar"},{"id":"products-color-wow-extra-mist-ical-shine-spray-5oz","name":"Color Wow Extra Mist-ical Shine Spray 5oz","sub":"Retail + Back Bar"},{"id":"products-unite-go365","name":"UNITE GO365","sub":"Retail + Back Bar"},{"id":"products-color-wow-insta-wow-advanced-dry-shampoo","name":"Color Wow Insta-Wow Advanced Dry Shampoo","sub":"Retail + Back Bar"},{"id":"products-unite-lazer-straight-relaxing-fluid","name":"UNITE Lazer Straight Relaxing Fluid","sub":"Retail + Back Bar"},{"id":"products-unite-le-play","name":"UNITE Le: Play","sub":"Retail + Back Bar"},{"id":"products-unite-liquid-volume","name":"UNITE Liquid Volume","sub":"Retail + Back Bar"},{"id":"products-unite-max-control","name":"UNITE Max Control","sub":"Retail + Back Bar"},{"id":"products-color-wow-money-mask-7-5-oz","name":"Color Wow Money Mask 7.5 oz","sub":"Retail + Back Bar"},{"id":"products-color-wow-money-mist-luxe-5-0-oz","name":"Color Wow Money Mist Luxe 5.0 oz","sub":"Retail + Back Bar"},{"id":"products-color-wow-one-minute-transformation-4-0-oz","name":"Color Wow One Minute Transformation 4.0 oz","sub":"Retail + Back Bar"},{"id":"products-color-wow-pop-lock-1-8-oz","name":"Color Wow Pop & Lock 1.8 oz","sub":"Retail + Back Bar"},{"id":"products-color-wow-raise-the-root-5oz","name":"Color Wow Raise the Root 5oz","sub":"Retail + Back Bar"},{"id":"products-unite-re-unite-conditioner","name":"UNITE Re: Unite Conditioner","sub":"Retail + Back Bar"},{"id":"products-unite-re-unite-shampoo","name":"UNITE Re: Unite Shampoo","sub":"Retail + Back Bar"},{"id":"products-unite-re-unite-treatment","name":"UNITE Re: Unite Treatment","sub":"Retail + Back Bar"},{"id":"products-color-wow-root-cover-up-black","name":"Color Wow Root Cover Up Black","sub":"Retail + Back Bar"},{"id":"products-color-wow-root-cover-up-blonde","name":"Color Wow Root Cover Up Blonde","sub":"Retail + Back Bar"},{"id":"products-color-wow-root-cover-up-dark-blonde","name":"Color Wow Root Cover Up Dark Blonde","sub":"Retail + Back Bar"},{"id":"products-color-wow-root-cover-up-dark-brown","name":"Color Wow Root Cover Up Dark Brown","sub":"Retail + Back Bar"},{"id":"products-color-wow-root-cover-up-medium-brown","name":"Color Wow Root Cover Up Medium Brown","sub":"Retail + Back Bar"},{"id":"products-color-wow-root-cover-up-red","name":"Color Wow Root Cover Up Red","sub":"Retail + Back Bar"},{"id":"products-color-wow-root-cover-up-light-brown","name":"Color Wow Root Cover Up light brown","sub":"Retail + Back Bar"},{"id":"products-color-wow-root-cover-up-platinum","name":"Color Wow Root Cover up Platinum","sub":"Retail + Back Bar"},{"id":"products-unite-second-day","name":"UNITE Second Day","sub":"Retail + Back Bar"},{"id":"products-unite-session-max","name":"UNITE Session Max","sub":"Retail + Back Bar"},{"id":"products-unite-silky-smooth-step-1","name":"UNITE Silky Smooth: Step 1","sub":"Retail + Back Bar"},{"id":"products-unite-silky-smooth-step-2","name":"UNITE Silky Smooth: Step 2","sub":"Retail + Back Bar"},{"id":"products-unite-smooth-shine","name":"UNITE Smooth & Shine","sub":"Retail + Back Bar"},{"id":"products-color-wow-speed-dry-5-oz","name":"Color Wow Speed Dry 5 oz","sub":"Retail + Back Bar"},{"id":"products-color-wow-style-on-steroids-7-oz","name":"Color Wow Style on Steroids 7 oz","sub":"Retail + Back Bar"},{"id":"products-color-wow-texas-hold-em-hairspray","name":"Color Wow Texas Hold 'Em Hairspray","sub":"Retail + Back Bar"},{"id":"products-unite-texturiza-foam","name":"UNITE Texturiza Foam","sub":"Retail + Back Bar"},{"id":"products-unite-texturiza-spray","name":"UNITE Texturiza Spray","sub":"Retail + Back Bar"},{"id":"products-unite-u-oil","name":"UNITE U Oil","sub":"Retail + Back Bar"},{"id":"products-unite-u-dry-fresh","name":"UNITE U: Dry Fresh","sub":"Retail + Back Bar"},{"id":"products-unite-u-dry-high","name":"UNITE U: Dry High","sub":"Retail + Back Bar"},{"id":"products-unite-u-dry-plus","name":"UNITE U: Dry Plus+","sub":"Retail + Back Bar"},{"id":"products-unite-u-dry-clear","name":"UNITE U:Dry Clear","sub":"Retail + Back Bar"},{"id":"products-color-wow-xtra-large-6-5-oz","name":"Color Wow Xtra Large 6.5 oz","sub":"Retail + Back Bar"},{"id":"products-unite-7-seconds-conditioner","name":"UNITE 7 Seconds Conditioner","sub":"Retail only"},{"id":"products-unite-7-seconds-masque-4oz","name":"UNITE 7 Seconds Masque 4oz","sub":"Retail only"},{"id":"products-unite-7-seconds-shampoo","name":"UNITE 7 Seconds Shampoo","sub":"Retail only"},{"id":"products-unite-blonda-daily-shampoo","name":"UNITE Blonda Daily Shampoo","sub":"Retail only"},{"id":"products-unite-blonda-toning-shampoo","name":"UNITE Blonda Toning Shampoo","sub":"Retail only"},{"id":"products-unite-boosta-shampoo","name":"UNITE Boosta Shampoo","sub":"Retail only"},{"id":"products-unite-boosta-spray-hairspray","name":"UNITE Boosta Spray + Hairspray","sub":"Retail only"},{"id":"products-unite-doggy-poo","name":"UNITE Doggy Poo","sub":"Retail only"},{"id":"products-unite-doggy-poo-leave-in","name":"UNITE Doggy Poo Leave-in","sub":"Retail only"},{"id":"products-color-wow-dream-coat-2","name":"Color Wow Dream Coat","sub":"Retail only"},{"id":"products-color-wow-dream-coat-curly-6-7-oz","name":"Color Wow Dream Coat Curly 6.7 oz","sub":"Retail only"},{"id":"products-color-wow-dream-coat-extra-6-7-oz","name":"Color Wow Dream Coat Extra 6.7 oz","sub":"Retail only"},{"id":"products-color-wow-dream-filter-6-7oz","name":"Color Wow Dream Filter 6.7oz","sub":"Retail only"},{"id":"products-unite-gone-in-7-seconds-auburn","name":"UNITE Gone in 7 seconds auburn","sub":"Retail only"},{"id":"products-unite-gone-in-7-seconds-dark-brown-black","name":"UNITE Gone in 7 seconds dark brown/black","sub":"Retail only"},{"id":"products-unite-gone-in-7-seconds-light-brown","name":"UNITE Gone in 7 seconds light brown","sub":"Retail only"},{"id":"products-unite-lazer-straight-conditioner","name":"UNITE Lazer Straight Conditioner","sub":"Retail only"},{"id":"products-unite-lazer-straight-shampoo","name":"UNITE Lazer Straight Shampoo","sub":"Retail only"},{"id":"products-unite-silky-smooth-step-3","name":"UNITE Silky Smooth: Step 3","sub":"Retail only"},{"id":"products-unite-u-lux-conditioner","name":"UNITE U Lux Conditioner","sub":"Retail only"},{"id":"products-unite-u-lux-shampoo","name":"UNITE U Lux Shampoo","sub":"Retail only"}],"Stations":[{"id":"stations-7-seconds-anti-frizz","name":"7 Seconds Anti Frizz","sub":"Working Bottles"},{"id":"stations-7-seconds-blowout","name":"7 Seconds Blowout","sub":"Working Bottles"},{"id":"stations-7-seconds-detangler","name":"7 Seconds Detangler","sub":"Working Bottles"},{"id":"stations-7-seconds-glossing","name":"7 Seconds Glossing","sub":"Working Bottles"},{"id":"stations-beach-day","name":"Beach Day","sub":"Working Bottles"},{"id":"stations-blonda-oil","name":"Blonda Oil","sub":"Working Bottles"},{"id":"stations-blow-and-set","name":"Blow and Set","sub":"Working Bottles"},{"id":"stations-boosta-finishing","name":"Boosta Finishing","sub":"Working Bottles"},{"id":"stations-boosta-thickening","name":"Boosta Thickening","sub":"Working Bottles"},{"id":"stations-boosta-volume-spray","name":"Boosta Volume Spray","sub":"Working Bottles"},{"id":"stations-color-control-purple","name":"Color Control Purple","sub":"Working Bottles"},{"id":"stations-conundrum","name":"Conundrum","sub":"Working Bottles"},{"id":"stations-creamy-paste","name":"Creamy Paste","sub":"Working Bottles"},{"id":"stations-cult-favorite","name":"Cult Favorite","sub":"Working Bottles"},{"id":"stations-elevate-mousse","name":"Elevate Mousse","sub":"Working Bottles"},{"id":"stations-expanda-dust","name":"Expanda Dust","sub":"Working Bottles"},{"id":"stations-expanda-volume","name":"Expanda Volume","sub":"Working Bottles"},{"id":"stations-extra-mistical","name":"Extra Mistical","sub":"Working Bottles"},{"id":"stations-go365","name":"Go365","sub":"Working Bottles"},{"id":"stations-insta-wow","name":"Insta Wow","sub":"Working Bottles"},{"id":"stations-lazer-straight","name":"Lazer Straight","sub":"Working Bottles"},{"id":"stations-le-play","name":"Le Play","sub":"Working Bottles"},{"id":"stations-liquid-volume","name":"Liquid Volume","sub":"Working Bottles"},{"id":"stations-one-min-transformation","name":"One min transformation","sub":"Working Bottles"},{"id":"stations-pop-lock","name":"Pop &Lock","sub":"Working Bottles"},{"id":"stations-raise-the-root","name":"Raise the Root","sub":"Working Bottles"},{"id":"stations-second-day","name":"Second Day","sub":"Working Bottles"},{"id":"stations-session-max","name":"Session Max","sub":"Working Bottles"},{"id":"stations-smooth-and-shine","name":"Smooth and Shine","sub":"Working Bottles"},{"id":"stations-speed-dry","name":"Speed Dry","sub":"Working Bottles"},{"id":"stations-style-on-steroids","name":"Style on Steroids","sub":"Working Bottles"},{"id":"stations-texas-hold-em","name":"Texas Hold'em","sub":"Working Bottles"},{"id":"stations-texturiza-foam","name":"Texturiza foam","sub":"Working Bottles"},{"id":"stations-texturiza-spray","name":"Texturiza Spray","sub":"Working Bottles"},{"id":"stations-u-dry-clear","name":"U-Dry Clear","sub":"Working Bottles"},{"id":"stations-u-dry-fresh","name":"U-Dry Fresh","sub":"Working Bottles"},{"id":"stations-u-dry-high","name":"U-Dry High","sub":"Working Bottles"},{"id":"stations-u-dry-plus","name":"U-Dry Plus","sub":"Working Bottles"},{"id":"stations-xtra-large","name":"Xtra Large","sub":"Working Bottles"},{"id":"stations-bobby-pins-black","name":"Bobby Pins Black","sub":"Station Supplies"},{"id":"stations-bobby-pins-blonde","name":"Bobby Pins Blonde","sub":"Station Supplies"},{"id":"stations-bobby-pins-brown","name":"Bobby Pins Brown","sub":"Station Supplies"},{"id":"stations-hair-pins-black","name":"Hair Pins Black","sub":"Station Supplies"},{"id":"stations-hair-pins-blonde","name":"Hair Pins Blonde","sub":"Station Supplies"},{"id":"stations-hair-pins-brown","name":"Hair Pins Brown","sub":"Station Supplies"},{"id":"stations-duck-bills","name":"Duck Bills","sub":"Station Supplies"},{"id":"stations-elastics-black","name":"Elastics Black","sub":"Station Supplies"},{"id":"stations-elastics-white","name":"Elastics White","sub":"Station Supplies"}],"Travel-Minis":[{"id":"travel-minis-7-seconds-conditioner","name":"7 Seconds Conditioner","sub":"UNITE"},{"id":"travel-minis-7-seconds-detangler","name":"7 Seconds Detangler","sub":"UNITE"},{"id":"travel-minis-7-seconds-shampoo","name":"7 Seconds Shampoo","sub":"UNITE"},{"id":"travel-minis-blonda-conditioner","name":"Blonda Conditioner","sub":"UNITE"},{"id":"travel-minis-blonda-toning-shampoo","name":"Blonda Toning Shampoo","sub":"UNITE"},{"id":"travel-minis-blow-set","name":"Blow & Set","sub":"UNITE"},{"id":"travel-minis-boing-conditioner","name":"Boing Conditioner","sub":"UNITE"},{"id":"travel-minis-boing-shampoo","name":"Boing Shampoo","sub":"UNITE"},{"id":"travel-minis-boing-defining-curling-cream","name":"Boing Defining Curling Cream","sub":"UNITE"},{"id":"travel-minis-boing-leave-in","name":"Boing Leave in","sub":"UNITE"},{"id":"travel-minis-boosta-conditioner","name":"Boosta Conditioner","sub":"UNITE"},{"id":"travel-minis-boosta-shampoo","name":"Boosta Shampoo","sub":"UNITE"},{"id":"travel-minis-boosta-spray","name":"Boosta Spray","sub":"UNITE"},{"id":"travel-minis-lazer-straight-conditioner","name":"Lazer Straight Conditioner","sub":"UNITE"},{"id":"travel-minis-lazer-straight-relaxing-fluid","name":"Lazer Straight Relaxing Fluid","sub":"UNITE"},{"id":"travel-minis-lazer-straight-shampoo","name":"Lazer Straight Shampoo","sub":"UNITE"},{"id":"travel-minis-re-unite-conditioner","name":"Re: Unite Conditioner","sub":"UNITE"},{"id":"travel-minis-re-unite-shampoo","name":"Re: Unite Shampoo","sub":"UNITE"},{"id":"travel-minis-u-dry-clear","name":"U: Dry Clear","sub":"UNITE"},{"id":"travel-minis-u-dry-high","name":"U: Dry High","sub":"UNITE"},{"id":"travel-minis-u-dry-plus","name":"U: Dry Plus+","sub":"UNITE"},{"id":"travel-minis-insta-wow-advanced-dry-shampoo","name":"Insta-Wow Advanced Dry Shampoo","sub":"Color Wow"},{"id":"travel-minis-carb-cocktail","name":"Carb cocktail","sub":"Color Wow"},{"id":"travel-minis-coconut-cocktail","name":"Coconut cocktail","sub":"Color Wow"},{"id":"travel-minis-kale-cocktail","name":"Kale cocktail","sub":"Color Wow"},{"id":"travel-minis-color-security-conditioner-fine-normal","name":"Color security conditioner (fine-normal)","sub":"Color Wow"},{"id":"travel-minis-color-security-shampoo","name":"Color Security Shampoo","sub":"Color Wow"},{"id":"travel-minis-dream-coat-curly","name":"Dream coat curly","sub":"Color Wow"},{"id":"travel-minis-dream-coat-extra","name":"Dream coat Extra","sub":"Color Wow"},{"id":"travel-minis-dream-coat-mini","name":"Dream coat mini","sub":"Color Wow"},{"id":"travel-minis-dream-filter","name":"Dream Filter","sub":"Color Wow"},{"id":"travel-minis-extra-mystical-shine-spray","name":"Extra mystical shine spray","sub":"Color Wow"},{"id":"travel-minis-cult-favorite","name":"Cult favorite","sub":"Color Wow"},{"id":"travel-minis-money-mask","name":"Money mask","sub":"Color Wow"},{"id":"travel-minis-one-minute-transformation","name":"One minute transformation","sub":"Color Wow"},{"id":"travel-minis-pop-lock","name":"Pop & lock","sub":"Color Wow"},{"id":"travel-minis-raise-the-root","name":"Raise the root","sub":"Color Wow"},{"id":"travel-minis-style-on-steroids","name":"Style on steroids","sub":"Color Wow"},{"id":"travel-minis-xtra-large","name":"Xtra large","sub":"Color Wow"},{"id":"travel-minis-money-mist","name":"Money Mist","sub":"Color Wow"}],"Bar Supplies":[{"id":"bar-supplies-sponges","name":"Sponges","sub":"Cleaning Supplies"},{"id":"bar-supplies-tissues","name":"Tissues","sub":"Cleaning Supplies"},{"id":"bar-supplies-barbicide","name":"Barbicide","sub":"Cleaning Supplies"},{"id":"bar-supplies-paper-towels-everyday-use","name":"Paper Towels (Everyday Use)","sub":"Cleaning Supplies"},{"id":"bar-supplies-paper-towels-restroom","name":"Paper Towels (Restroom)","sub":"Cleaning Supplies"},{"id":"bar-supplies-clorox-wipes","name":"Clorox Wipes","sub":"Cleaning Supplies"},{"id":"bar-supplies-big-trash-bags","name":"Big Trash Bags","sub":"Cleaning Supplies"},{"id":"bar-supplies-little-trash-bags","name":"Little Trash Bags","sub":"Cleaning Supplies"},{"id":"bar-supplies-swiffer-dust-pads","name":"Swiffer Dust Pads","sub":"Cleaning Supplies"},{"id":"bar-supplies-swiffer-dry-pads","name":"Swiffer Dry Pads","sub":"Cleaning Supplies"},{"id":"bar-supplies-toilet-paper","name":"Toilet Paper","sub":"Cleaning Supplies"},{"id":"bar-supplies-detergent-pods","name":"Detergent Pods","sub":"Cleaning Supplies"},{"id":"bar-supplies-dish-soap","name":"Dish Soap","sub":"Cleaning Supplies"},{"id":"bar-supplies-hand-soap","name":"Hand Soap","sub":"Cleaning Supplies"},{"id":"bar-supplies-mopping-solution","name":"Mopping Solution","sub":"Cleaning Supplies"},{"id":"bar-supplies-glass-cleaner","name":"Glass Cleaner","sub":"Cleaning Supplies"},{"id":"bar-supplies-bug-spray","name":"Bug Spray","sub":"Cleaning Supplies"},{"id":"bar-supplies-mop-head-curly","name":"Mop Head (Curly)","sub":"Cleaning Supplies"},{"id":"bar-supplies-mop-head-flat","name":"Mop Head (Flat)","sub":"Cleaning Supplies"},{"id":"bar-supplies-straws-stirrers","name":"Straws/Stirrers","sub":"Guest Amenities"},{"id":"bar-supplies-dr-pepper","name":"Dr Pepper","sub":"Guest Amenities"},{"id":"bar-supplies-cranberry-juice","name":"Cranberry Juice","sub":"Guest Amenities"},{"id":"bar-supplies-creamer","name":"Creamer","sub":"Guest Amenities"},{"id":"bar-supplies-tea-bags","name":"Tea Bags","sub":"Guest Amenities"},{"id":"bar-supplies-prosecco","name":"Prosecco","sub":"Guest Amenities"},{"id":"bar-supplies-sugar-packets","name":"Sugar Packets","sub":"Guest Amenities"},{"id":"bar-supplies-to-go-lids-cups","name":"To Go Lids & Cups","sub":"Guest Amenities"},{"id":"bar-supplies-coke-zero","name":"Coke Zero","sub":"Guest Amenities"},{"id":"bar-supplies-sprite","name":"Sprite","sub":"Guest Amenities"},{"id":"bar-supplies-sparkling-water","name":"Sparkling Water","sub":"Guest Amenities"},{"id":"bar-supplies-water","name":"Water","sub":"Guest Amenities"},{"id":"bar-supplies-orange-juice","name":"Orange Juice","sub":"Guest Amenities"},{"id":"bar-supplies-nespresso-capsules-coffee","name":"Nespresso Capsules (Coffee)","sub":"Guest Amenities"},{"id":"bar-supplies-volume-lashes","name":"volume lashes","sub":"Make-Up Supplies"},{"id":"bar-supplies-natural-lashes","name":"natural lashes","sub":"Make-Up Supplies"},{"id":"bar-supplies-half-lashes","name":"half lashes","sub":"Make-Up Supplies"},{"id":"bar-supplies-anime-lashes","name":"anime lashes","sub":"Make-Up Supplies"},{"id":"bar-supplies-eye-tapes","name":"Eye Tapes","sub":"Make-Up Supplies"},{"id":"bar-supplies-lash-glue","name":"Lash Glue","sub":"Make-Up Supplies"},{"id":"bar-supplies-white-beauty-sponges","name":"White Beauty Sponges","sub":"Make-Up Supplies"},{"id":"bar-supplies-powder-puffs","name":"Powder Puffs","sub":"Make-Up Supplies"},{"id":"bar-supplies-micellar-water","name":"Micellar Water","sub":"Make-Up Supplies"},{"id":"bar-supplies-q-tips","name":"Q Tips","sub":"Make-Up Supplies"},{"id":"bar-supplies-micro-applicator","name":"Micro Applicator","sub":"Make-Up Supplies"},{"id":"bar-supplies-lash-spoolies","name":"Lash Spoolies","sub":"Make-Up Supplies"},{"id":"bar-supplies-liner-brushes","name":"Liner Brushes","sub":"Make-Up Supplies"},{"id":"bar-supplies-disposable-lip-wands","name":"Disposable lip wands","sub":"Make-Up Supplies"},{"id":"bar-supplies-cotton-pads","name":"Cotton Pads","sub":"Make-Up Supplies"},{"id":"bar-supplies-makeup-remover-wipes","name":"Makeup Remover Wipes","sub":"Make-Up Supplies"},{"id":"bar-supplies-brush-cleaner","name":"Brush Cleaner","sub":"Make-Up Supplies"},{"id":"bar-supplies-alcohol","name":"Alcohol","sub":"Make-Up Supplies"},{"id":"bar-supplies-hand-sanitizer","name":"Hand Sanitizer","sub":"Make-Up Supplies"},{"id":"bar-supplies-tape","name":"Tape","sub":"Office Supplies"},{"id":"bar-supplies-sticky-notes","name":"Sticky Notes","sub":"Office Supplies"},{"id":"bar-supplies-printer-paper","name":"Printer Paper","sub":"Office Supplies"},{"id":"bar-supplies-pink-retail-bags","name":"Pink Retail Bags","sub":"Office Supplies"},{"id":"bar-supplies-blo-cards-beauty-expert-cards","name":"Blo Cards/Beauty Expert Cards","sub":"Office Supplies"},{"id":"bar-supplies-hair-donut-blonde","name":"Hair Donut Blonde","sub":"Salon Supplies"},{"id":"bar-supplies-bobby-pins-brown","name":"Bobby Pins Brown","sub":"Stylist Station"},{"id":"bar-supplies-hair-pins-black","name":"Hair Pins Black","sub":"Stylist Station"},{"id":"bar-supplies-hair-pins-brown","name":"Hair Pins Brown","sub":"Stylist Station"},{"id":"bar-supplies-duck-bills","name":"Duck Bills","sub":"Stylist Station"},{"id":"bar-supplies-silicone-beads-black","name":"Silicone Beads Black","sub":"Salon Supplies"},{"id":"bar-supplies-silicone-beads-brown","name":"Silicone Beads Brown","sub":"Salon Supplies"},{"id":"bar-supplies-hair-donut-black","name":"Hair Donut Black","sub":"Salon Supplies"},{"id":"bar-supplies-hair-donut-brown","name":"Hair Donut Brown","sub":"Salon Supplies"},{"id":"bar-supplies-alligator-clips","name":"Alligator Clips","sub":"Salon Supplies"},{"id":"bar-supplies-hair-tinsel","name":"Hair Tinsel","sub":"Salon Supplies"},{"id":"bar-supplies-bobby-pins-black","name":"Bobby Pins Black","sub":"Stylist Station"},{"id":"bar-supplies-bobby-pins-blonde","name":"Bobby Pins Blonde","sub":"Stylist Station"},{"id":"bar-supplies-hair-pins-blonde","name":"Hair Pins Blonde","sub":"Stylist Station"},{"id":"bar-supplies-elastics-black","name":"Elastics Black","sub":"Stylist Station"},{"id":"bar-supplies-elastics-clear","name":"Elastics Clear","sub":"Salon Supplies"},{"id":"bar-supplies-shower-caps","name":"Shower Caps","sub":"Salon Supplies"},{"id":"bar-supplies-gloves","name":"Gloves","sub":"Salon Supplies"},{"id":"bar-supplies-silicone-beads-blonde","name":"Silicone Beads Blonde","sub":"Salon Supplies"},{"id":"bar-supplies-black-ink-cartride","name":"black ink cartride","sub":"Salon Supplies"}],"Makeup":[{"id":"makeup-colorluxe-hydrating-cream-lipstick-bellini","name":"COLORLUXE HYDRATING CREAM LIPSTICK BELLINI","sub":"Lip"},{"id":"makeup-colorluxe-hydrating-cream-lipstick-copper-dune","name":"COLORLUXE HYDRATING CREAM LIPSTICK COPPER DUNE","sub":"Lip"},{"id":"makeup-colorluxe-hydrating-cream-lipstick-blush","name":"COLORLUXE HYDRATING CREAM LIPSTICK Blush","sub":"Lip"},{"id":"makeup-beyond-matte-lip-stain-blissed-out","name":"Beyond Matte Lip Stain Blissed-Out","sub":"Lip"},{"id":"makeup-beyond-matte-lip-stain-craving","name":"Beyond Matte Lip Stain Craving","sub":"Lip"},{"id":"makeup-beyond-matte-lip-stain-fascination","name":"Beyond Matte Lip Stain Fascination","sub":"Lip"},{"id":"makeup-beyond-matte-lip-stain-lovestruck","name":"Beyond Matte Lip Stain Lovestruck","sub":"Lip"},{"id":"makeup-beyond-matte-lip-stain-muse","name":"Beyond Matte Lip Stain Muse","sub":"Lip"},{"id":"makeup-beyond-matte-lip-stain-brazen","name":"Beyond Matte Lip Stain Brazen","sub":"Lip"},{"id":"makeup-beyond-matte-lip-stain-obsession","name":"Beyond Matte Lip Stain Obsession","sub":"Lip"},{"id":"makeup-colorluxe-hydrating-cream-lipstick-magnolia","name":"COLORLUXE HYDRATING CREAM LIPSTICK Magnolia","sub":"Lip"},{"id":"makeup-lip-pencil-nutmeg","name":"Lip Pencil Nutmeg","sub":"Lip"},{"id":"makeup-lip-pencil-warm-rose","name":"Lip Pencil Warm Rose","sub":"Lip"},{"id":"makeup-colorluxe-eye-shadow-stick-rose","name":"COLORLUXE EYE SHADOW STICK ROSE","sub":"Eye"},{"id":"makeup-lash-fixation-tubing-mascara-black","name":"Lash Fixation Tubing Mascara Black","sub":"Eye"},{"id":"makeup-liquid-eyeliner-black","name":"Liquid Eyeliner Black","sub":"Eye"},{"id":"makeup-purepressed-eye-shadow-triple-sundown","name":"PurePressed Eye Shadow Triple Sundown","sub":"Eye"},{"id":"makeup-colorluxe-liquid-blush-sugar-magnolia","name":"ColorLuxe Liquid Blush Sugar Magnolia","sub":"Cheek"},{"id":"makeup-dream-tint-tinted-moisturizer-dark","name":"Dream Tint Tinted Moisturizer Dark","sub":"Complexion"},{"id":"makeup-dream-tint-tinted-moisturizer-medium-light","name":"Dream Tint Tinted Moisturizer Medium Light","sub":"Complexion"},{"id":"makeup-purebronze-matte-bronzer-powder-dark","name":"PureBronze Matte Bronzer Powder Dark","sub":"Complexion"},{"id":"makeup-purebrow-precision-pencil-neautral-blonde","name":"PureBrow Precision Pencil Neautral Blonde","sub":"Complexion"},{"id":"makeup-purematch-liquid-concealer-5w","name":"PureMatch Liquid Concealer 5W","sub":"Complexion"},{"id":"makeup-purepressed-base-refill-caramel","name":"PurePressed Base REFILL Caramel","sub":"Complexion"},{"id":"makeup-purepressed-base-refill-radiant","name":"PurePressed Base REFILL Radiant","sub":"Complexion"},{"id":"makeup-refillable-compact-white","name":"Refillable Compact White","sub":"Complexion"},{"id":"makeup-skintuition-liquid-foundation-14-fair","name":"Skintuition Liquid Foundation 14 Fair","sub":"Complexion"},{"id":"makeup-skintuition-liquid-foundation-20-light","name":"Skintuition Liquid Foundation 20 Light","sub":"Complexion"},{"id":"makeup-skintuition-liquid-foundation-26-light","name":"Skintuition Liquid Foundation 26 Light","sub":"Complexion"},{"id":"makeup-skintuition-liquid-foundation-28-light","name":"Skintuition Liquid Foundation 28 Light","sub":"Complexion"},{"id":"makeup-skintuition-liquid-foundation-30-light-medium","name":"Skintuition Liquid Foundation 30 Light Medium","sub":"Complexion"},{"id":"makeup-skintuition-liquid-foundation-36-light-medium","name":"Skintuition Liquid Foundation 36 Light Medium","sub":"Complexion"},{"id":"makeup-skintuition-liquid-foundation-38","name":"Skintuition Liquid Foundation 38","sub":"Complexion"},{"id":"makeup-smooth-affair-face-primer-brightening","name":"Smooth Affair Face Primer Brightening","sub":"Complexion"},{"id":"makeup-tiny-treasures-4-piece-makeup-set","name":"TINY TREASURES 4-PIECE MAKEUP SET","sub":"RETIRED — old vendor (bareMinerals). Sell through; never reorder."},{"id":"makeup-barepro-16hr-powder-foundation-15-fair-cool","name":"BAREPRO 16HR POWDER FOUNDATION 15 FAIR COOL","sub":"RETIRED — old vendor (bareMinerals). Sell through; never reorder."},{"id":"makeup-barepro-performance-wear-liquid-foundation-spf-20-sandstone","name":"BAREPRO PERFORMANCE WEAR LIQUID FOUNDATION SPF 20 SANDSTONE","sub":"RETIRED — old vendor (bareMinerals). Sell through; never reorder."},{"id":"makeup-gen-nude-blonzer","name":"GEN NUDE BLONZER","sub":"RETIRED — old vendor (bareMinerals). Sell through; never reorder."},{"id":"makeup-maximist-mascara","name":"MAXIMIST MASCARA","sub":"RETIRED — old vendor (bareMinerals). Sell through; never reorder."},{"id":"makeup-mineralist-gloss-balm-sincerity","name":"MINERALIST GLOSS-BALM SINCERITY","sub":"RETIRED — old vendor (bareMinerals). Sell through; never reorder."},{"id":"makeup-mineralist-gloss-balm-wonder","name":"MINERALIST GLOSS-BALM WONDER","sub":"RETIRED — old vendor (bareMinerals). Sell through; never reorder."},{"id":"makeup-mineralist-matte-liquid-lipstick-passionate","name":"MINERALIST MATTE LIQUID LIPSTICK PASSIONATE","sub":"RETIRED — old vendor (bareMinerals). Sell through; never reorder."},{"id":"makeup-mineralist-matte-liquid-lipstick-spirited","name":"MINERALIST MATTE LIQUID LIPSTICK SPIRITED","sub":"RETIRED — old vendor (bareMinerals). Sell through; never reorder."},{"id":"makeup-original-loose-powder-foundation-spf-15-08-light","name":"ORIGINAL LOOSE POWDER FOUNDATION SPF 15 08 LIGHT","sub":"RETIRED — old vendor (bareMinerals). Sell through; never reorder."}]};
+
+  var restockSelected = {}; // shared across both views — the same night's data either way
+
+  function makeRestockView(suffix){
+    var searchEl = document.getElementById('restock-search' + suffix);
+    var subtabbarEl = document.getElementById('restock-subtabbar' + suffix);
+    var catalogEl = document.getElementById('restock-catalog' + suffix);
+    var catalogCountEl = document.getElementById('restock-catalog-count' + suffix);
+    var countEl = document.getElementById('restock-count' + suffix);
+    var listEl = document.getElementById('restock-selected-list' + suffix);
+    var emptyEl = document.getElementById('restock-empty-note' + suffix);
+    var cat = "Products";
+
+    var CAP = 40;
+    function renderCatalog(){
+      var q = (searchEl.value || '').toLowerCase();
+      var items = CATALOG[cat] || [];
+      var matches = items.filter(function(it){ return it.name.toLowerCase().indexOf(q) !== -1; });
+      var visible = matches.slice(0, CAP);
+      var html = visible.length ? visible.map(function(it){
+        var sel = !!restockSelected[it.id];
+        var check = sel ? '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"></path></svg>' : '';
+        return '<button type="button" class="catalog-item' + (sel?' selected':'') + '" data-id="' + it.id + '">' +
+          '<span class="ci-check">' + check + '</span>' +
+          '<span class="ci-text"><span class="ci-name">' + it.name + '</span><span class="ci-sub">' + it.sub + '</span></span>' +
+          '</button>';
+      }).join('') : '<p class="helper" style="padding:10px">No matches.</p>';
+      catalogEl.innerHTML = html;
+      catalogCountEl.textContent = matches.length > CAP
+        ? 'Showing ' + CAP + ' of ' + matches.length + ' — refine your search to narrow it down.'
+        : matches.length + (matches.length === 1 ? ' item' : ' items') + ' in ' + cat + '.';
+
+      catalogEl.querySelectorAll('.catalog-item').forEach(function(btn){
+        btn.addEventListener('click', function(){
+          var id = btn.getAttribute('data-id');
+          var it = items.filter(function(x){ return x.id === id; })[0];
+          if(restockSelected[id]){ delete restockSelected[id]; }
+          else { restockSelected[id] = {name: it.name, cat: cat, note: ''}; }
+          renderAllRestockViews();
+        });
+      });
+    }
+
+    function renderSelected(){
+      var ids = Object.keys(restockSelected);
+      countEl.textContent = ids.length;
+      emptyEl.hidden = ids.length > 0;
+      listEl.innerHTML = ids.map(function(id){
+        var r = restockSelected[id];
+        return '<div class="restock-row" data-id="' + id + '">' +
+          '<div class="rr-name">' + r.name + '<span class="rr-tab">' + r.cat + '</span></div>' +
+          '<input type="text" class="rr-note" placeholder="note (optional)" value="' + r.note.replace(/"/g,'&quot;') + '">' +
+          '<button type="button" class="btn btn-ghost btn-sm">Remove</button>' +
+          '</div>';
+      }).join('');
+      listEl.querySelectorAll('.restock-row').forEach(function(row){
+        var id = row.getAttribute('data-id');
+        row.querySelector('.rr-note').addEventListener('input', function(e){ restockSelected[id].note = e.target.value; });
+        row.querySelector('.btn').addEventListener('click', function(){ delete restockSelected[id]; renderAllRestockViews(); });
+      });
+    }
+
+    searchEl.addEventListener('input', renderCatalog);
+    subtabbarEl.querySelectorAll('.subtab').forEach(function(btn){
+      btn.addEventListener('click', function(){
+        subtabbarEl.querySelectorAll('.subtab').forEach(function(b){ b.classList.remove('active'); });
+        btn.classList.add('active');
+        cat = btn.getAttribute('data-cat');
+        renderCatalog();
+      });
+    });
+
+    return { renderCatalog: renderCatalog, renderSelected: renderSelected };
+  }
+
+  var restockViews = [makeRestockView('-tc')];
+  function renderAllRestockViews(){
+    restockViews.forEach(function(v){ v.renderCatalog(); v.renderSelected(); });
+  }
+  renderAllRestockViews();
+
+})();
+</script>
+
+</body></html>
