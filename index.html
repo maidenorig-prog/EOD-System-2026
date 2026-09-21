@@ -421,6 +421,50 @@ function appMain(){
     if(n < 0) return '<div style="margin-top:8px"><span class="pill pill-reorder">Short $'+Math.abs(n).toFixed(2)+'</span></div>';
     return '<div style="margin-top:8px"><span class="pill pill-warn">Over $'+n.toFixed(2)+'</span></div>';
   }
+  function renderOverShortPillReadOnly(val){
+    if(val === "" || val == null) return '<span class="pill pill-neutral">Not entered</span>';
+    var n = Number(val);
+    if(isNaN(n)) return '<span class="pill pill-neutral">Not entered</span>';
+    if(n === 0) return '<span class="pill pill-ok">Balanced</span>';
+    if(n < 0) return '<span class="pill pill-reorder">Short $'+Math.abs(n).toFixed(2)+'</span>';
+    return '<span class="pill pill-warn">Over $'+n.toFixed(2)+'</span>';
+  }
+  function registerCloseHasData(e){
+    return (e.cashOverShort != null) || (e.depositAmount != null) || !!e.registerPhotoUrl || !!e.dashboardCsvUrl;
+  }
+  function renderRegisterCloseHistory(e){
+    if(!registerCloseHasData(e)){
+      return '<div style="margin-top:12px"><strong>Register Close:</strong> <span class="helper">No register close data logged.</span></div>';
+    }
+    var html = '<div style="margin-top:12px"><strong>Register Close</strong></div>';
+    html += '<div class="grid-2" style="margin-top:6px">';
+    html += '<div><span class="helper">Over / Short</span><div style="margin-top:4px">'+renderOverShortPillReadOnly(e.cashOverShort!=null?String(e.cashOverShort):"")+'</div></div>';
+    html += '<div><span class="helper">Deposit Amount</span><div class="mono" style="margin-top:8px">'+(e.depositAmount!=null?'$'+Number(e.depositAmount).toFixed(2):'\u2014')+'</div></div>';
+    html += '</div>';
+    html += '<div class="grid-2" style="margin-top:12px">';
+    html += '<div>';
+    if(e.registerPhotoUrl){
+      html += '<div class="drop has-file"><div class="thumb-row">' +
+        '<img src="'+e.registerPhotoUrl+'" alt="Closed-register screenshot">' +
+        '<div class="thumb-meta"><div class="thumb-name">'+escapeHtml(e.registerPhotoName||"Photo attached")+'</div></div>' +
+        '</div></div>';
+    } else {
+      html += '<span class="helper">No photo attached.</span>';
+    }
+    html += '</div>';
+    html += '<div>';
+    if(e.dashboardCsvUrl){
+      html += '<div class="drop has-file"><div class="csv-row">' +
+        '<div class="csv-icon">'+ICONS.file+'</div>' +
+        '<div class="thumb-meta"><div class="thumb-name">'+escapeHtml(e.dashboardCsvName||"File attached")+'</div></div>' +
+        '</div>' + renderCsvPreview(e.dashboardCsvUrl) + '</div>';
+    } else {
+      html += '<span class="helper">No dashboard file attached.</span>';
+    }
+    html += '</div>';
+    html += '</div>';
+    return html;
+  }
   function parseCsvRow(line){
     var out = [], cur = "", inQuotes = false;
     for(var i=0;i<line.length;i++){
@@ -735,6 +779,7 @@ function appMain(){
           '<div><strong>Cleaning Duties:</strong> '+escapeHtml(e.cleaning||"No note logged.")+'</div>' +
           '<div><strong>Operational Notes:</strong> '+escapeHtml(e.opsNotes||"No note logged.")+'</div>' +
           '</div>';
+        out += renderRegisterCloseHistory(e);
         if(!restocks.length){
           out += '<div class="banner banner-good">Nothing needed restocking.</div>';
         } else {
