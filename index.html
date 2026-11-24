@@ -1014,6 +1014,60 @@ function appMain(){
     return '<!doctype html>\n<html lang="en" data-theme="light">\n<head>\n' + head + '\n</head>\n<body>\n<div id="app"></div>\n<script>\n' + script + '\n<' + '/script>\n</body>\n</html>';
   }
 
+  /* ---------- flag e-mail alerts (Web3Forms) ----------
+     Each Web3Forms access key delivers to ONE inbox. Paste one key per recipient:
+       stephanie@win-cap.net  -> key 1
+       maidenorig@win-cap.net -> key 2
+     Leave the list empty to turn alerts off. Keys are public by design (restrict them
+     to this site's domain in the Web3Forms dashboard). */
+  var EMAIL_ALERT_KEYS = [
+    "d6cc7a34-18ea-44dc-b8b7-452cd532cd24"  /* maidenorig@win-cap.net */
+    /* , "<stephanie key>"  -- stephanie@win-cap.net */
+  ];
+  var EMAIL_ENDPOINT = "https://api.web3forms.com/submit";
+
+  function catalogItemLabel(id){
+    var it = (STATE.catalog||[]).find(function(x){ return x.id===id; });
+    if(!it) return id;
+    return [it.brand, it.name].filter(Boolean).join(" ") || id;
+  }
+  /* returns {lines:[...]} describing every flag on the entry; empty lines = nothing flagged */
+  function buildFlagLines(e){
+    var lines = [];
+    if(frontDeskAnyFlag(e.frontDesk)) lines.push("FRONT DESK & SALON: " + (e.frontDesk.detail||""));
+    if(lateCancelsAnyFlag(e.lateCancels)) lines.push("LATE CANCELS & NO-SHOWS: " + (e.lateCancels.detail||""));
+    if(e.cleaning && e.cleaning !== CLEANING_OK) lines.push("CLEANING NOT FINISHED: " + e.cleaning);
+    if(e.opsNotes && e.opsNotes !== OPS_OK) lines.push("OPERATIONAL NOTE: " + e.opsNotes);
+    var rs = e.nothingToRestock ? [] : (e.restocks||[]);
+    rs.forEach(function(r){ lines.push("RESTOCK: " + catalogItemLabel(r.id) + (r.note ? " — " + r.note : "")); });
+    return lines;
+  }
+  function sendFlagEmail(entry, prevEntry){
+    if(!EMAIL_ALERT_KEYS.length) return;
+    var lines = buildFlagLines(entry);
+    if(!lines.length) return;
+    /* re-saving an unchanged count shouldn't re-send the same alert */
+    var prevLines = prevEntry ? buildFlagLines(prevEntry) : [];
+    if(prevLines.length && prevLines.join("\n") === lines.join("\n")) return;
+    var updated = prevLines.length > 0;
+    var subject = "EOD flag" + (updated ? " (updated)" : "") + " — " + entry.location + " — " + formatDateLong(entry.date);
+    var message = entry.location + " · " + formatDateLong(entry.date) + "\nClosed by: " + (entry.closer||"unknown") + "\n\n" +
+      lines.join("\n\n") + "\n\nOpen the dashboard to mark items Completed:\n" + location.href.split("#")[0].split("?")[0];
+    var failed = 0, pending = EMAIL_ALERT_KEYS.length;
+    EMAIL_ALERT_KEYS.forEach(function(key){
+      fetch(EMAIL_ENDPOINT, {
+        method: "POST",
+        headers: {"Content-Type":"application/json", "Accept":"application/json"},
+        body: JSON.stringify({access_key:key, subject:subject, from_name:"Blo EOD System", message:message})
+      }).then(function(r){ return r.json(); }).then(function(j){ if(!j || !j.success) failed++; })
+        .catch(function(){ failed++; })
+        .then(function(){
+          pending--;
+          if(pending===0 && failed) showToast("Saved — but the flag email couldn’t be sent to " + failed + " recipient" + (failed>1?"s":"") + ".");
+        });
+    });
+  }
+
   function saveEntry(entry, successMsg){
     if(ui.saving) return;
     ui.saving = true; render();
@@ -1124,6 +1178,7 @@ function appMain(){
       submittedAt: new Date().toISOString()
     };
     saveEntry(entry, "Saved tonight’s restock list for " + loc + ".");
+    try{ sendFlagEmail(entry, prevEntry); }catch(err){}
   }
 
   function addCatalogItem(tab){
