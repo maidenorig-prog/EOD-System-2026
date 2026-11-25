@@ -832,11 +832,17 @@ function appMain(){
       var cleanFlag = e.cleaning && e.cleaning !== CLEANING_OK;
       var opsFlag = e.opsNotes && e.opsNotes !== OPS_OK;
       var notesFlag = fdFlag || lcFlag || cleanFlag || opsFlag;
+      var notesOpen = (fdFlag && !getCompletion(e,"frontDesk") ? 1 : 0) + (lcFlag && !getCompletion(e,"lateCancels") ? 1 : 0) +
+                      (cleanFlag && !getCompletion(e,"cleaning") ? 1 : 0) + (opsFlag && !getCompletion(e,"opsNotes") ? 1 : 0);
+      var notesTotal = (fdFlag?1:0) + (lcFlag?1:0) + (cleanFlag?1:0) + (opsFlag?1:0);
+      var notesPill = !notesFlag ? '<span class="pill pill-ok">Clear</span>' :
+        (notesOpen===0 ? '<span class="pill pill-ok">Completed</span>' :
+         '<span class="pill pill-warn">Review'+(notesOpen<notesTotal ? ' · '+notesOpen+' left' : '')+'</span>');
       out += '<tr><td><button class="history-toggle" data-action="toggle-history" data-key="'+key+'"><svg class="chev'+(open?" open":"")+'" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M9 6l6 6-6 6"></path></svg></button></td>' +
         '<td>'+formatDateLong(e.date)+'</td><td>'+escapeHtml(e.location)+'</td><td>'+escapeHtml(e.closer||"—")+'</td>' +
         '<td>'+(restocks.length ? '<span class="pill pill-reorder">'+restocks.length+'</span>' : '<span class="pill pill-ok">0</span>')+'</td>' +
         '<td>'+(prev ? (risk.flag ? '<span class="pill pill-warn">'+risk.overlap+'/'+risk.curTotal+'</span>' : '<span class="pill pill-ok">ok</span>') : '<span class="pill pill-neutral">n/a</span>')+'</td>' +
-        '<td>'+(e.frontDesk===undefined && e.opsNotes===undefined ? '<span class="pill pill-neutral">n/a</span>' : (notesFlag ? '<span class="pill pill-warn">Review</span>' : '<span class="pill pill-ok">Clear</span>'))+'</td></tr>';
+        '<td>'+(e.frontDesk===undefined && e.opsNotes===undefined ? '<span class="pill pill-neutral">n/a</span>' : notesPill)+'</td></tr>';
       if(open){
         out += '<tr class="detail-row"><td></td><td colspan="6">' +
           '<div class="stack" style="margin-bottom:12px">' +
